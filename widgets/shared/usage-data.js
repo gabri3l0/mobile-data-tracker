@@ -12,12 +12,13 @@ async function loadUsage(settings) {
   const now = Date.now();
   const cache = readCache(settings);
   if (cache && cache.retryAt > now) {
-    return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
+    return { data: cache.data, updateFailed: true, connectionPending: cache.connectionPending === true, refreshAt: cache.retryAt };
   }
   if (cache && cache.data && now - cache.fetchedAt < settings.cacheMinutes * 60000) {
     return {
       data: cache.data,
       updateFailed: cache.updateFailed,
+      connectionPending: cache.connectionPending === true,
       refreshAt: cache.fetchedAt + settings.cacheMinutes * 60000,
     };
   }
@@ -28,14 +29,15 @@ async function loadUsage(settings) {
     await checkServerReady(settings);
     const data = await fetchUsage(settings);
     const fetchedAt = Date.now();
-    writeCache(settings, { data, fetchedAt, retryAt: 0, updateFailed: false });
-    return { data, updateFailed: false, refreshAt: fetchedAt + settings.cacheMinutes * 60000 };
+    writeCache(settings, { data, fetchedAt, retryAt: 0, updateFailed: false, connectionPending: false });
+    return { data, updateFailed: false, connectionPending: false, refreshAt: fetchedAt + settings.cacheMinutes * 60000 };
   } catch (error) {
     // Do not log request details, credentials, or the server's response body.
     const retryAt = error.retryAt || Date.now() + settings.retryMinutes * 60000;
     const data = cache ? cache.data : null;
-    writeCache(settings, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true });
-    return { data, updateFailed: true, refreshAt: retryAt };
+    const connectionPending = error.connectionPending === true;
+    writeCache(settings, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true, connectionPending });
+    return { data, updateFailed: true, connectionPending, refreshAt: retryAt };
   }
 }
 
@@ -51,6 +53,7 @@ async function checkServerReady(settings) {
     // One attempt only. Let a future widget execution check again.
   }
   const error = new Error("Server is not ready.");
+  error.connectionPending = true;
   error.retryAt = Date.now() + settings.wakeRetryMinutes * 60000;
   throw error;
 }

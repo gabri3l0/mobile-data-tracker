@@ -1,4 +1,5 @@
 // Configure your local copy only. Never share it with real credentials.
+const RUN_AT = new Date();
 const SETTINGS = {
   apiUrl: "",       // Complete usage endpoint.
   healthUrl: "",    // Complete health endpoint on the same server.
@@ -10,9 +11,8 @@ const SETTINGS = {
 
 // Set true for an offline preview; no API request is made in sample mode.
 const USE_SAMPLE_DATA = false;
-// Sample mode only: "success", "stale", or "error".
+// Sample mode: "success", "stale", "error", "connecting", "connecting-empty".
 const PREVIEW_STATE = "success";
-const TITLE = "Mi consumo";
 const COLORS = {
   background: "101012",
   text: "FFFFFF",
@@ -60,6 +60,16 @@ function formatExpiration(value) {
   return `${Number(day)} ${months[Number(month) - 1]}`;
 }
 
+function formatRunTime(date) {
+  const pad = value => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function addExecutionTime(widget) {
+  widget.addSpacer(3);
+  addText(widget, `Ejecutado · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
+}
+
 function drawProgressBar(percentage) {
   const context = new DrawContext();
   context.size = new Size(BAR_WIDTH, BAR_HEIGHT);
@@ -91,7 +101,7 @@ function addText(stack, value, font, color) {
   return text;
 }
 
-function createWidget({ data, updateFailed, refreshAt }) {
+function createWidget({ data, updateFailed, connectionPending = false, refreshAt }) {
   const widget = new ListWidget();
   // iOS decides the actual refresh time; this is only the earliest requested time.
   if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
@@ -100,23 +110,26 @@ function createWidget({ data, updateFailed, refreshAt }) {
   // iOS applies the outer widget corner shape.
   const header = widget.addStack();
   header.centerAlignContent();
-  addText(header, TITLE, Font.boldSystemFont(12), COLORS.text);
+  const title = header.addStack();
+  title.size = new Size(96, 14);
+  addText(title, data && data.plan_name ? data.plan_name : "Consumo", Font.boldSystemFont(11), COLORS.text);
   header.addSpacer();
-  addText(header, "DATOS", Font.boldSystemFont(8), COLORS.accent);
+  addText(header, "Telcel", Font.boldSystemFont(8), COLORS.accent);
 
   if (!data) {
     widget.addSpacer();
-    addText(widget, "No se pudo cargar", Font.boldSystemFont(13), COLORS.text);
+    addText(widget, connectionPending ? "Iniciando conexión" : "No se pudo cargar", Font.boldSystemFont(13), COLORS.text);
     widget.addSpacer(5);
-    addText(widget, "Intenta más tarde", Font.systemFont(11), COLORS.muted);
+    addText(widget, connectionPending ? "Reintenta en 2 min" : "Intenta más tarde", Font.systemFont(11), COLORS.muted);
     widget.addSpacer();
+    addExecutionTime(widget);
     return widget;
   }
 
-  widget.addSpacer(7);
+  widget.addSpacer(3);
   const reading = widget.addStack();
   reading.bottomAlignContent();
-  addText(reading, formatGB(data.remaining_gb), Font.boldSystemFont(36), COLORS.text);
+  addText(reading, formatGB(data.remaining_gb), Font.boldSystemFont(connectionPending ? 32 : 34), COLORS.text);
   reading.addSpacer(4);
   const unit = reading.addStack();
   unit.layoutVertically();
@@ -124,7 +137,7 @@ function createWidget({ data, updateFailed, refreshAt }) {
   unit.addSpacer(7);
   addText(widget, `disponibles de ${formatGB(data.total_gb)} GB`, Font.systemFont(10), COLORS.muted);
 
-  widget.addSpacer(7);
+  widget.addSpacer(3);
   const progress = widget.addImage(drawProgressBar(data.used_percentage));
   progress.imageSize = new Size(BAR_WIDTH, BAR_HEIGHT);
   progress.leftAlignImage();
@@ -135,17 +148,25 @@ function createWidget({ data, updateFailed, refreshAt }) {
     addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
     widget.addSpacer(3);
   }
-  addText(widget, `Lectura · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
+  addText(widget, `Actualizado · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
   if (updateFailed) {
     widget.addSpacer(3);
-    addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.accent);
+    addText(widget, connectionPending ? "Iniciando conexión" : "No se pudo actualizar", Font.systemFont(8), COLORS.accent);
+    if (connectionPending) {
+      addText(widget, "Reintenta en 2 min", Font.systemFont(8), COLORS.accent);
+    }
   }
+  addExecutionTime(widget);
   return widget;
 }
 
 // Install usage-data.js alongside this script in Scriptable for live data.
 const result = USE_SAMPLE_DATA
-  ? { data: PREVIEW_STATE === "error" ? null : SAMPLE_DATA, updateFailed: PREVIEW_STATE !== "success" }
+  ? {
+    data: ["error", "connecting-empty"].includes(PREVIEW_STATE) ? null : SAMPLE_DATA,
+    updateFailed: PREVIEW_STATE !== "success",
+    connectionPending: PREVIEW_STATE.startsWith("connecting"),
+  }
   : await importModule("usage-data").loadUsage(SETTINGS);
 const widget = createWidget(result);
 Script.setWidget(widget);
