@@ -1,48 +1,82 @@
 # Mobile Data Tracker
 
-An unofficial Python client that retrieves mobile data usage from a carrier account. It logs in, fetches account information, and prints the plan name, data used and remaining, usage percentages, and expiration date.
+Unofficial Python client and API for retrieving mobile data usage, plan details, and expiration dates.
 
 ## Setup
 
-Requires Python 3.11+ and `uv`.
+Requires Python 3.11+ and UV.
 
 ```bash
-uv sync --dev
+uv sync
 cp .env.example .env
 ```
 
-Fill in `.env` with your account credentials and carrier API settings. Obtain the details from the carrier web portal, API documentation, or your administrator. The client expects the carrier's specific API format; changing endpoints alone does not make it compatible with other carriers.
+Fill in the carrier settings in `.env`. Keep credentials and tokens private.
+This client supports the current carrier API format; changing URLs does not add support for another carrier.
 
-Keep `.env` private. It is excluded from Git.
+## CLI
 
-## Run
-
-From the project root:
+Set `CARRIER_USERNAME` and `CARRIER_PASSWORD` in `.env`, then run:
 
 ```bash
 uv run python main.py
 ```
 
-The app prints usage data and closes its HTTP connections when finished, including after a failure.
+The CLI prints usage data. It does not require an API key.
+Set `LOG_LEVEL=DEBUG` for more detailed CLI logs.
 
-## Local API and Bruno
+## API
 
-Start the API from the project root:
+Generate a random key for each invited person:
+
+```bash
+uv run python scripts/create_token.py
+```
+
+The script prints only the key and saves nothing. Add it to `.env`:
+
+```dotenv
+API_KEYS='{"alice":"<alice-key>","bob":"<bob-key>"}'
+```
+
+Start the server:
 
 ```bash
 uv run uvicorn mobile_data_tracker.api:app --reload
 ```
 
-Interactive documentation is available at <http://127.0.0.1:8000/docs>.
-FastAPI generates the OpenAPI schema at <http://127.0.0.1:8000/openapi.json>.
-No exported schema file or shared Bruno collection is maintained in this repository.
+Open <http://127.0.0.1:8000/docs>, click **Authorize**, and enter your key without the `Bearer` prefix.
 
-1. With the API running, select **Import Collection → OpenAPI** in Bruno and import from `http://127.0.0.1:8000/openapi.json`.
-2. Save the collection locally; skip **Initialize Git**. Check that requests use `http://127.0.0.1:8000` as their base URL.
-3. Open `GET /health` and send it to verify the connection without calling the carrier.
-4. Open `POST /v1/usage` and use a JSON body with `username` and `password`. Store real credentials in Bruno's local secret variables, keeping them out of tracked files.
+- `GET /health`: checks the server; no key required.
+- `POST /v1/usage`: requires `Authorization: Bearer <key>` and a JSON body:
 
-For example, reference those variables in the JSON body:
+```json
+{
+  "username": "<phone-number>",
+  "password": "<carrier-password>"
+}
+```
+
+The API uses the submitted credentials and returns parsed usage data. Credentials and carrier tokens are not saved.
+Missing or invalid API keys return `401`; invalid request bodies return `422`.
+
+Keys do not expire. Add, change, or remove entries in `API_KEYS`, then restart the server.
+The API requires valid `API_KEYS` configuration to start. Use HTTPS when hosting it.
+
+## Rate limit
+
+Each configured person gets **two usage attempts per rolling 15 minutes**, across IP addresses and carrier accounts.
+Carrier failures count; invalid input, invalid keys, and health checks do not.
+Extra attempts return `429` with `Retry-After` in seconds.
+Counters reset when the server sleeps or restarts. Run one server process.
+
+## Bruno
+
+1. Start the API and import **OpenAPI from URL**: `http://127.0.0.1:8000/openapi.json`.
+2. In **Environments → Configure → Import**, select [bruno/local.env.example.json](bruno/local.env.example.json).
+3. Select **Mobile Data Tracker - Local**. Mark `username`, `password`, and `api_key` as secret, then enter your values locally. Leave the repository template blank.
+4. Set the usage request URL to `{{base_url}}/v1/usage` and **Auth → Bearer Token** to `{{api_key}}`.
+5. Use this JSON body:
 
 ```json
 {
@@ -51,18 +85,8 @@ For example, reference those variables in the JSON body:
 }
 ```
 
-Reuse the imported collection for subsequent sessions. When API paths, request bodies,
-responses, or authentication change, reimport the schema into a new collection and
-replace the old collection after checking its requests. Importing does not automatically
-keep an existing collection synchronized. Internal implementation changes do not require
-reimporting. FastAPI regenerates its schema after the application reloads; no generation
-command is needed.
-
-Usage is limited to two attempts per IP address in a rolling 15-minute window.
-Carrier failures count; invalid input and health checks do not. A blocked request
-returns `429` with a `Retry-After` header in seconds. Counters are in memory and reset
-when the server restarts; use one server process. Authentication is not implemented
-yet, so keep the API local during this stage.
+Change credentials in the environment to use another carrier account. Keep the same request.
+Reimport the OpenAPI schema when paths, schemas, or authentication change; imports do not sync automatically.
 
 ## Tests
 
@@ -70,26 +94,10 @@ yet, so keep the API local during this stage.
 uv run pytest -v
 ```
 
-Run one test file:
-
-```bash
-uv run pytest tests/test_carrier.py -v
-```
-
-Tests use mocked HTTP requests and do not require carrier credentials.
-
-## Logging
-
-For the CLI, set `LOG_LEVEL=INFO` in `.env` for progress and error messages, or `LOG_LEVEL=DEBUG` for diagnostic details. Usernames, endpoints, passwords, and tokens are omitted from application logs.
+Tests use mocked carrier requests and do not require real credentials.
 
 ## Disclaimer
 
-This project is an unofficial, open-source Python client for a mobile carrier's online account service.
-
-It is not affiliated with, endorsed by, or sponsored by the carrier or its operating company.
-
-This software is intended for accessing information from accounts owned or otherwise authorized by the user.
-
-Users are responsible for complying with applicable laws and the carrier's terms of service.
-
-No credentials, authentication tokens, or proprietary carrier software are distributed with this project.
+This project is unofficial and is not affiliated with, endorsed by, or sponsored by the carrier.
+Use only accounts you own or are authorized to access, and comply with applicable laws and carrier terms.
+No credentials, tokens, or proprietary carrier software are distributed with this project.
