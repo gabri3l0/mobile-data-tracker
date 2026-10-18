@@ -35,6 +35,10 @@ class CarrierProvider:
         error_type = CarrierError
         try:
             response = self._http.request(method, url, **kwargs)
+            logger.debug(
+                "Carrier response from %s (HTTP %s): %s",
+                url, response.status_code, response.text,
+            )
             response.raise_for_status()
             result = response.json()
             if isinstance(result, dict):
