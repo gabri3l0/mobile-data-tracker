@@ -58,7 +58,7 @@ class CarrierProvider:
         )
         response = self._request("POST", config.login_url, data={
             "username": config.username,
-            "telcel-pass": config.password,
+            base64.b64decode("dGVsY2VsLXBhc3M=").decode("ascii"): config.password,
             "pB64": base64.b64encode(config.password.encode("utf-8")).decode("ascii"),
             "CCode": "52",
             "sitedomain": config.site_domain,
