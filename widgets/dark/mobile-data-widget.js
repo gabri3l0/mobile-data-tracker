@@ -1,16 +1,12 @@
 // Configure your local copy only. Never share it with real credentials.
-// API_URL is the complete usage endpoint, including its path.
-const API_URL = "";
-// Complete health endpoint for the same server. No credentials are sent to it.
-const HEALTH_URL = "";
-const API_KEY = "";
-const USERNAME = "";
-const PASSWORD = "";
-const REQUEST_TIMEOUT_SECONDS = 20;
-const HEALTH_TIMEOUT_SECONDS = 5;
-const WAKE_RETRY_MINUTES = 2;
-const CACHE_MINUTES = 30;
-const RETRY_MINUTES = 15;
+const SETTINGS = {
+  apiUrl: "",       // Complete usage endpoint.
+  healthUrl: "",    // Complete health endpoint on the same server.
+  apiKey: "",      // No Bearer prefix.
+  username: "",
+  password: "",
+  cacheMinutes: 30,
+};
 
 // Set true for an offline preview; no API request is made in sample mode.
 const USE_SAMPLE_DATA = false;
@@ -38,138 +34,6 @@ const SAMPLE_DATA = {
   used_percentage: 77.14,
   remaining_percentage: 22.86,
 };
-
-async function loadUsage() {
-  if (USE_SAMPLE_DATA) {
-    return {
-      data: PREVIEW_STATE === "error" ? null : SAMPLE_DATA,
-      updateFailed: PREVIEW_STATE !== "success",
-    };
-  }
-  const now = Date.now();
-  const cache = readCache();
-  if (cache && cache.retryAt > now) {
-    return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
-  }
-  if (cache && cache.data && now - cache.fetchedAt < CACHE_MINUTES * 60000) {
-    return {
-      data: cache.data,
-      updateFailed: cache.updateFailed,
-      refreshAt: cache.fetchedAt + CACHE_MINUTES * 60000,
-    };
-  }
-  try {
-    if (![API_URL, HEALTH_URL, API_KEY, USERNAME, PASSWORD].every(value => value.trim())) {
-      throw new Error("Configure the API settings in your local script.");
-    }
-    await checkServerReady();
-    const data = await fetchUsage();
-    const fetchedAt = Date.now();
-    writeCache({ data, fetchedAt, retryAt: 0, updateFailed: false });
-    return { data, updateFailed: false, refreshAt: fetchedAt + CACHE_MINUTES * 60000 };
-  } catch (error) {
-    // Do not log request details, credentials, or the server's response body.
-    const retryAt = error.retryAt || Date.now() + RETRY_MINUTES * 60000;
-    const data = cache ? cache.data : null;
-    writeCache({ data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true });
-    return { data, updateFailed: true, refreshAt: retryAt };
-  }
-}
-
-async function checkServerReady() {
-  try {
-    const request = new Request(HEALTH_URL);
-    request.method = "GET";
-    request.timeoutInterval = HEALTH_TIMEOUT_SECONDS;
-    const body = await request.loadString();
-    const status = request.response.statusCode;
-    if (status >= 200 && status < 300 && JSON.parse(body).status === "ok") return;
-  } catch {
-    // One attempt only. Let a future widget execution check again.
-  }
-  const error = new Error("Server is not ready.");
-  error.retryAt = Date.now() + WAKE_RETRY_MINUTES * 60000;
-  throw error;
-}
-
-function cacheLocation() {
-  const files = FileManager.local();
-  // Separate account files. No password or bearer key is stored in the cache.
-  const name = `mobile-data-dark-${encodeURIComponent(USERNAME)}.json`;
-  return { files, path: files.joinPath(files.libraryDirectory(), name) };
-}
-
-function readCache() {
-  try {
-    const { files, path } = cacheLocation();
-    if (!files.fileExists(path)) return null;
-    const cache = JSON.parse(files.readString(path));
-    if (cache.source !== API_URL || !(cache.data === null || isUsageData(cache.data))
-      || !Number.isFinite(cache.fetchedAt) || cache.fetchedAt < 0 || cache.fetchedAt > Date.now()
-      || !Number.isFinite(cache.retryAt) || typeof cache.updateFailed !== "boolean") return null;
-    return cache;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(cache) {
-  try {
-    const { files, path } = cacheLocation();
-    files.writeString(path, JSON.stringify({ source: API_URL, ...cache }));
-  } catch {
-    // A storage failure should not hide a successful API reading.
-  }
-}
-
-async function fetchUsage() {
-  if (![API_URL, API_KEY, USERNAME, PASSWORD].every(value => value.trim())) {
-    throw new Error("Configure the API settings in your local script.");
-  }
-  const request = new Request(API_URL);
-  request.method = "POST";
-  request.headers = {
-    "Authorization": `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-  };
-  request.body = JSON.stringify({ username: USERNAME, password: PASSWORD });
-  request.timeoutInterval = REQUEST_TIMEOUT_SECONDS;
-  const body = await request.loadString();
-  const status = request.response.statusCode;
-  if (status === 429) {
-    const headers = request.response.headers || {};
-    const header = Object.keys(headers).find(key => key.toLowerCase() === "retry-after");
-    const value = header ? String(headers[header]).trim() : "";
-    const seconds = /^\d+$/.test(value) ? Number(value) : NaN;
-    const deadline = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(value);
-    const error = new Error("Usage limit reached.");
-    error.retryAt = Number.isFinite(deadline) && deadline > Date.now()
-      ? deadline : Date.now() + RETRY_MINUTES * 60000;
-    throw error;
-  }
-  if (status < 200 || status >= 300) {
-    throw new Error("Unable to retrieve usage data.");
-  }
-  const data = JSON.parse(body);
-  if (!isUsageData(data)) {
-    throw new Error("Unable to retrieve usage data.");
-  }
-  return data;
-}
-
-function isUsageData(data) {
-  return data !== null && typeof data === "object" && !Array.isArray(data)
-    && ["remaining_gb", "total_gb", "used_percentage", "days_until"].every(
-      key => typeof data[key] === "number" && Number.isFinite(data[key])
-    )
-    && typeof data.last_updated === "string"
-    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(data.last_updated)
-    && (data.expiration_date === null || (
-      typeof data.expiration_date === "string"
-      && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date)
-    ));
-}
 
 function formatGB(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
@@ -279,7 +143,11 @@ function createWidget({ data, updateFailed, refreshAt }) {
   return widget;
 }
 
-const widget = createWidget(await loadUsage());
+// Install usage-data.js alongside this script in Scriptable for live data.
+const result = USE_SAMPLE_DATA
+  ? { data: PREVIEW_STATE === "error" ? null : SAMPLE_DATA, updateFailed: PREVIEW_STATE !== "success" }
+  : await importModule("usage-data").loadUsage(SETTINGS);
+const widget = createWidget(result);
 Script.setWidget(widget);
 if (!config.runsInWidget) await widget.presentSmall();
 Script.complete();
