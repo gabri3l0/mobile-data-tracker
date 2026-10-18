@@ -5,8 +5,10 @@ description = "A mobile carrier API client for retrieving and parsing data usage
 requires-python = ">=3.11"
 # Logging uses Python's standard library; no additional dependency is required.
 dependencies = [
+    "fastapi>=0.143.3",
     "httpx>=0.28,<0.29",
     "python-dotenv>=1,<2",
+    "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
