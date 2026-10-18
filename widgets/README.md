@@ -7,6 +7,23 @@ You need a running usage API. See the [backend guide](../docs/backend.md).
 
 Double-click [dark/preview.html](dark/preview.html). It uses sample data and makes no API calls.
 
+For an image background, open [image/preview.html](image/preview.html).
+It uses sample usage data and downloads the background image from the configured URL.
+
+## Image-background design
+
+Use [image/mobile-data-widget.js](image/mobile-data-widget.js) in a Scriptable script
+named **Mobile Data Image**, alongside the same **usage-data** helper.
+Follow the setup below, choosing **Mobile Data Image** instead of **Mobile Data Dark**.
+
+Change `BACKGROUND_IMAGE_URL` near the top of the widget or HTML preview to use
+another image. `BACKGROUND_OVERLAY_OPACITY` controls the dark overlay (default `0.75`).
+Edit each file separately when changing the preview and iPhone background.
+Images are cropped to fill the card and cached on the iPhone for 24 hours. If loading
+fails, the last image for that URL is reused, or the background stays dark.
+Usage caching and server retries work the same for both designs.
+Sample mode skips the usage API; the image may still need internet on its first load.
+
 ## Set up in Scriptable
 
 1. Install Scriptable on your iPhone.
