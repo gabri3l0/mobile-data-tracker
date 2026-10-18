@@ -56,7 +56,7 @@ class CarrierProvider:
             CARRIER_SITE_DOMAIN=config.site_domain,
             CARRIER_LOGIN_URL=config.login_url,
         )
-        response = self._request("POST", config.login_url, data={
+        response = self._request("POST", config.login_url, follow_redirects=True, data={
             "username": config.username,
             base64.b64decode("dGVsY2VsLXBhc3M=").decode("ascii"): config.password,
             "pB64": base64.b64encode(config.password.encode("utf-8")).decode("ascii"),
@@ -102,12 +102,14 @@ class CarrierProvider:
             logger.error("Carrier access token retrieval failed.")
             raise CarrierError("Failed to get access token.")
 
-        token = response
-        for key in ("tokenResponse", "tokens", "token:b2f", "access_token"):
-            if not isinstance(token, dict):
-                logger.error("Access token response is missing a valid token.")
-                raise CarrierError("Access token response is missing a valid token.")
-            token = token.get(key)
+        token_response = response.get("tokenResponse")
+        tokens = token_response.get("tokens") if isinstance(token_response, dict) else None
+        token = None
+        if isinstance(tokens, list):
+            for entry in tokens:
+                if isinstance(entry, dict) and entry.get("id") == "token:b2f":
+                    token = entry.get("access_token")
+                    break
 
         if not isinstance(token, str) or not token.strip():
             logger.error("Access token response is missing a valid token.")

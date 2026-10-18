@@ -36,7 +36,10 @@ def test_login_rejects_failed_status_and_invalid_tokens(carrier, payload):
 def test_access_token_request_and_nested_response(carrier):
     carrier.payload = {
         "message": "Éxito.",
-        "tokenResponse": {"tokens": {"token:b2f": {"access_token": "access-token"}}},
+        "tokenResponse": {"tokens": [
+            {"id": "token:other", "access_token": "other-token"},
+            {"id": "token:b2f", "access_token": "access-token"},
+        ]},
     }
     assert carrier.provider.get_access_token(login_token="login-token") == "access-token"
     request, = carrier.requests
@@ -50,6 +53,16 @@ def test_access_token_request_and_nested_response(carrier):
 @pytest.mark.parametrize("payload", [
     {}, {"message": "Éxito."}, {"message": "Éxito.", "tokenResponse": []},
     {"message": "Éxito.", "tokenResponse": {"tokens": {"token:b2f": {"access_token": " "}}}},
+    {"message": "Éxito.", "tokenResponse": {"tokens": []}},
+    {"message": "Éxito.", "tokenResponse": {"tokens": [
+        {"id": "token:other", "access_token": "other-token"},
+    ]}},
+    {"message": "Éxito.", "tokenResponse": {"tokens": [
+        {"id": "token:b2f", "access_token": " "},
+    ]}},
+    {"message": "Éxito.", "tokenResponse": {"tokens": [
+        {"id": "token:b2f"},
+    ]}},
 ])
 def test_access_token_rejects_malformed_responses(carrier, payload):
     carrier.payload = payload
