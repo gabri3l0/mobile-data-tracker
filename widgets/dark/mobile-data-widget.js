@@ -1,5 +1,14 @@
-// Sample-only design. This standalone file runs in Scriptable on iOS.
-// Choose "success", "stale", or "error" to preview each state.
+// Configure your local copy only. Never share it with real credentials.
+// API_URL is the complete usage endpoint, including its path.
+const API_URL = "";
+const API_KEY = "";
+const USERNAME = "";
+const PASSWORD = "";
+const REQUEST_TIMEOUT_SECONDS = 20;
+
+// Set true for an offline preview; no API request is made in sample mode.
+const USE_SAMPLE_DATA = false;
+// Sample mode only: "success", "stale", or "error".
 const PREVIEW_STATE = "success";
 const TITLE = "Mi consumo";
 const COLORS = {
@@ -24,12 +33,53 @@ const SAMPLE_DATA = {
   remaining_percentage: 22.86,
 };
 
-// Replace only this data-loading function when API integration is added.
 async function loadUsage() {
-  return {
-    data: PREVIEW_STATE === "error" ? null : SAMPLE_DATA,
-    updateFailed: PREVIEW_STATE !== "success",
+  if (USE_SAMPLE_DATA) {
+    return {
+      data: PREVIEW_STATE === "error" ? null : SAMPLE_DATA,
+      updateFailed: PREVIEW_STATE !== "success",
+    };
+  }
+  try {
+    return { data: await fetchUsage(), updateFailed: false };
+  } catch {
+    // Do not log request details, credentials, or the server's response body.
+    return { data: null, updateFailed: true };
+  }
+}
+
+async function fetchUsage() {
+  if (![API_URL, API_KEY, USERNAME, PASSWORD].every(value => value.trim())) {
+    throw new Error("Configure the API settings in your local script.");
+  }
+  const request = new Request(API_URL);
+  request.method = "POST";
+  request.headers = {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+    "Accept": "application/json",
   };
+  request.body = JSON.stringify({ username: USERNAME, password: PASSWORD });
+  request.timeoutInterval = REQUEST_TIMEOUT_SECONDS;
+  const data = await request.loadJSON();
+  const status = request.response.statusCode;
+  if (status < 200 || status >= 300 || !isUsageData(data)) {
+    throw new Error("Unable to retrieve usage data.");
+  }
+  return data;
+}
+
+function isUsageData(data) {
+  return data !== null && typeof data === "object" && !Array.isArray(data)
+    && ["remaining_gb", "total_gb", "used_percentage", "days_until"].every(
+      key => typeof data[key] === "number" && Number.isFinite(data[key])
+    )
+    && typeof data.last_updated === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(data.last_updated)
+    && (data.expiration_date === null || (
+      typeof data.expiration_date === "string"
+      && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date)
+    ));
 }
 
 function formatGB(value) {
@@ -126,8 +176,10 @@ function createWidget({ data, updateFailed }) {
   widget.addSpacer(3);
   addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted);
   widget.addSpacer();
-  addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
-  widget.addSpacer(3);
+  if (data.expiration_date !== null) {
+    addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
+    widget.addSpacer(3);
+  }
   addText(widget, `Lectura · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
   if (updateFailed) {
     widget.addSpacer(3);
