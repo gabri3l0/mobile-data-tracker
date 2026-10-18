@@ -1,10 +1,14 @@
 // Configure your local copy only. Never share it with real credentials.
 // API_URL is the complete usage endpoint, including its path.
 const API_URL = "";
+// Complete health endpoint for the same server. No credentials are sent to it.
+const HEALTH_URL = "";
 const API_KEY = "";
 const USERNAME = "";
 const PASSWORD = "";
 const REQUEST_TIMEOUT_SECONDS = 20;
+const HEALTH_TIMEOUT_SECONDS = 5;
+const WAKE_RETRY_MINUTES = 2;
 const CACHE_MINUTES = 30;
 const RETRY_MINUTES = 15;
 
@@ -55,6 +59,10 @@ async function loadUsage() {
     };
   }
   try {
+    if (![API_URL, HEALTH_URL, API_KEY, USERNAME, PASSWORD].every(value => value.trim())) {
+      throw new Error("Configure the API settings in your local script.");
+    }
+    await checkServerReady();
     const data = await fetchUsage();
     const fetchedAt = Date.now();
     writeCache({ data, fetchedAt, retryAt: 0, updateFailed: false });
@@ -66,6 +74,22 @@ async function loadUsage() {
     writeCache({ data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true });
     return { data, updateFailed: true, refreshAt: retryAt };
   }
+}
+
+async function checkServerReady() {
+  try {
+    const request = new Request(HEALTH_URL);
+    request.method = "GET";
+    request.timeoutInterval = HEALTH_TIMEOUT_SECONDS;
+    const body = await request.loadString();
+    const status = request.response.statusCode;
+    if (status >= 200 && status < 300 && JSON.parse(body).status === "ok") return;
+  } catch {
+    // One attempt only. Let a future widget execution check again.
+  }
+  const error = new Error("Server is not ready.");
+  error.retryAt = Date.now() + WAKE_RETRY_MINUTES * 60000;
+  throw error;
 }
 
 function cacheLocation() {
