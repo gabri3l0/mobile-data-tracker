@@ -25,6 +25,45 @@ uv run python main.py
 
 The app prints usage data and closes its HTTP connections when finished, including after a failure.
 
+## Local API and Bruno
+
+Start the API from the project root:
+
+```bash
+uv run uvicorn mobile_data_tracker.api:app --reload
+```
+
+Interactive documentation is available at <http://127.0.0.1:8000/docs>.
+FastAPI generates the OpenAPI schema at <http://127.0.0.1:8000/openapi.json>.
+No exported schema file or shared Bruno collection is maintained in this repository.
+
+1. With the API running, select **Import Collection → OpenAPI** in Bruno and import from `http://127.0.0.1:8000/openapi.json`.
+2. Save the collection locally; skip **Initialize Git**. Check that requests use `http://127.0.0.1:8000` as their base URL.
+3. Open `GET /health` and send it to verify the connection without calling the carrier.
+4. Open `POST /v1/usage` and use a JSON body with `username` and `password`. Store real credentials in Bruno's local secret variables, keeping them out of tracked files.
+
+For example, reference those variables in the JSON body:
+
+```json
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+```
+
+Reuse the imported collection for subsequent sessions. When API paths, request bodies,
+responses, or authentication change, reimport the schema into a new collection and
+replace the old collection after checking its requests. Importing does not automatically
+keep an existing collection synchronized. Internal implementation changes do not require
+reimporting. FastAPI regenerates its schema after the application reloads; no generation
+command is needed.
+
+Usage is limited to two attempts per IP address in a rolling 15-minute window.
+Carrier failures count; invalid input and health checks do not. A blocked request
+returns `429` with a `Retry-After` header in seconds. Counters are in memory and reset
+when the server restarts; use one server process. Authentication is not implemented
+yet, so keep the API local during this stage.
+
 ## Tests
 
 ```bash
@@ -41,7 +80,7 @@ Tests use mocked HTTP requests and do not require carrier credentials.
 
 ## Logging
 
-Set `LOG_LEVEL=INFO` in `.env` for progress and error messages, or `LOG_LEVEL=DEBUG` for diagnostic details, including the username. Endpoints, passwords, and tokens are omitted from application logs.
+For the CLI, set `LOG_LEVEL=INFO` in `.env` for progress and error messages, or `LOG_LEVEL=DEBUG` for diagnostic details. Usernames, endpoints, passwords, and tokens are omitted from application logs.
 
 ## Disclaimer
 
