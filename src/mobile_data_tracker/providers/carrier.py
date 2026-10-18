@@ -12,6 +12,10 @@ class CarrierError(Exception):
     """An API failure with credentials and request URLs omitted."""
 
 
+class CarrierTimeoutError(CarrierError):
+    """The carrier did not respond within the configured timeout."""
+
+
 class CarrierProvider:
     def __init__(self, config: CarrierConfig) -> None:
         self.config = config
@@ -28,8 +32,13 @@ class CarrierProvider:
     def _request(self, method: str, url: str, **kwargs) -> dict[str, object]:
         logger.debug("Sending carrier %s request.", method)
         error = "Carrier request failed."
+        error_type = CarrierError
         try:
             response = self._http.request(method, url, **kwargs)
+            logger.debug(
+                "Carrier response from %s (HTTP %s): %s",
+                url, response.status_code, response.text,
+            )
             response.raise_for_status()
             result = response.json()
             if isinstance(result, dict):
@@ -38,18 +47,20 @@ class CarrierProvider:
             error = "Carrier returned a JSON value that is not an object."
         except httpx.HTTPStatusError as exc:
             error = f"Carrier request failed (HTTP {exc.response.status_code})."
+        except httpx.TimeoutException:
+            error = "Carrier request timed out."
+            error_type = CarrierTimeoutError
         except httpx.RequestError:
             error = "Carrier request failed due to a connection or timeout error."
         except (ValueError, httpx.InvalidURL):
             error = "Invalid request URL or carrier JSON response."
         # Raise outside the handler to avoid retaining a sensitive HTTP exception.
         logger.error("%s", error)
-        raise CarrierError(error)
+        raise error_type(error)
 
     def login(self) -> str:
         logger.info("Trying to log in to the carrier.")
         config = self.config
-        logger.debug("Carrier username: %s", config.username)
         self._require(
             CARRIER_USERNAME=config.username,
             CARRIER_PASSWORD=config.password,
