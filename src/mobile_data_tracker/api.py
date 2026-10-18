@@ -1,14 +1,19 @@
 import logging
 import math
+import json
+import os
+import secrets
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import date, datetime
 from threading import Lock
 from time import monotonic
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, SecretStr, field_validator
 
 from mobile_data_tracker.client import MobileDataTracker
@@ -76,8 +81,51 @@ class UsageRateLimiter:
             attempts.append(now)
 
 
-app = FastAPI(title="Mobile Data Tracker")
+def load_api_keys() -> dict[str, str]:
+    try:
+        keys = json.loads(os.environ.get("API_KEYS", ""))
+    except ValueError:
+        raise RuntimeError("API_KEYS must be a nonempty JSON mapping of people to unique keys.") from None
+    if (
+        not isinstance(keys, dict)
+        or not keys
+        or any(
+            not isinstance(person, str) or not person.strip()
+            or not isinstance(key, str) or not key.strip()
+            or key != key.strip() or any(char.isspace() for char in key)
+            for person, key in keys.items()
+        )
+        or len(set(keys.values())) != len(keys)
+    ):
+        raise RuntimeError("API_KEYS must be a nonempty JSON mapping of people to unique keys.")
+    return keys
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.api_keys = load_api_keys()
+    yield
+
+
+app = FastAPI(title="Mobile Data Tracker", lifespan=lifespan)
 usage_limiter = UsageRateLimiter()
+bearer = HTTPBearer(auto_error=False)
+
+
+def authenticate(
+    request: Request,
+    authorization: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> str:
+    if authorization is not None:
+        supplied_key = authorization.credentials.encode("utf-8")
+        for person, key in request.app.state.api_keys.items():
+            if secrets.compare_digest(supplied_key, key.encode("utf-8")):
+                return person
+    raise HTTPException(
+        status_code=401,
+        detail="Missing or invalid API key.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 @app.exception_handler(RequestValidationError)
@@ -100,8 +148,7 @@ def health() -> dict[str, str]:
 
 
 @app.post("/v1/usage", response_model=UsageResponse)
-def get_usage(credentials: UsageRequest, request: Request) -> UsageResponse:
-    caller = request.client.host if request.client else "unknown"
+def get_usage(credentials: UsageRequest, caller: str = Depends(authenticate)) -> UsageResponse:
     usage_limiter.check(caller)
     tracker = None
     try:

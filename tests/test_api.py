@@ -12,6 +12,7 @@ from mobile_data_tracker.providers.carrier import CarrierError, CarrierTimeoutEr
 @pytest.fixture(autouse=True)
 def reset_usage_limiter(monkeypatch):
     monkeypatch.setattr(api, "usage_limiter", api.UsageRateLimiter())
+    monkeypatch.setenv("API_KEYS", '{"alice":"alice-api-key","bob":"bob-api-key"}')
 
 
 def test_health_does_not_contact_carrier():
@@ -32,7 +33,7 @@ def usage_client(home_response):
         provider.login.return_value = "login-token"
         provider.get_access_token.return_value = "access-token"
         provider.get_home.return_value = home_response
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer alice-api-key"}) as client:
             yield client, provider_factory, provider
 
 
@@ -143,7 +144,8 @@ def test_callers_have_independent_limits(usage_client):
     body = {"username": "alice", "password": "secret"}
     for _ in range(2):
         assert client.post("/v1/usage", json=body).status_code == 200
-    with TestClient(app, client=("other-client", 12345)) as other_client:
+    # Same IP, different person: separate allowance.
+    with TestClient(app, headers={"Authorization": "Bearer bob-api-key"}) as other_client:
         assert other_client.post("/v1/usage", json=body).status_code == 200
 
 
@@ -163,3 +165,63 @@ def test_concurrent_attempts_cannot_exceed_limit():
         statuses = list(pool.map(attempt, range(8)))
     assert statuses.count(200) == 2
     assert statuses.count(429) == 6
+
+
+@pytest.mark.parametrize('authorization', ['', 'Bearer wrong-key', 'Basic alice-api-key', 'Bearer'])
+def test_missing_or_invalid_key_is_rejected_without_using_allowance(usage_client, authorization):
+    client, factory, _ = usage_client
+    body = {'username': 'alice', 'password': 'secret'}
+    response = client.post('/v1/usage', json=body, headers={'Authorization': authorization})
+    assert response.status_code == 401
+    assert response.headers['www-authenticate'] == 'Bearer'
+    assert response.headers['cache-control'] == 'no-store'
+    assert response.json() == {'detail': 'Missing or invalid API key.'}
+    factory.assert_not_called()
+    assert api.usage_limiter._attempts == {}
+
+
+def test_same_person_shares_limit_across_ips(usage_client):
+    client, _, _ = usage_client
+    body = {'username': 'alice', 'password': 'secret'}
+    for _ in range(2):
+        assert client.post('/v1/usage', json=body).status_code == 200
+    with TestClient(app, client=('other-ip', 12345), headers={'Authorization': 'Bearer alice-api-key'}) as other_client:
+        assert other_client.post('/v1/usage', json=body).status_code == 429
+
+
+@pytest.mark.parametrize('configured_keys', [
+    '', 'invalid-private-value', '{}', '[]', '{"alice":""}',
+    '{"alice":123}', '{"alice":[]}', '{"":"key"}',
+    '{"alice":"same","bob":"same"}', '{"alice":"two words"}',
+])
+def test_invalid_api_keys_prevent_startup(monkeypatch, configured_keys):
+    monkeypatch.setenv('API_KEYS', configured_keys)
+    with pytest.raises(RuntimeError, match='API_KEYS must be') as error:
+        with TestClient(app):
+            pass
+    assert 'invalid-private-value' not in str(error.value)
+
+
+def test_missing_api_keys_prevent_startup(monkeypatch):
+    monkeypatch.delenv('API_KEYS')
+    with pytest.raises(RuntimeError, match='API_KEYS must be'):
+        with TestClient(app):
+            pass
+
+
+def test_openapi_describes_bearer_authentication():
+    with TestClient(app) as client:
+        schema = client.get('/openapi.json').json()
+    assert schema['components']['securitySchemes']['HTTPBearer']['scheme'] == 'bearer'
+    assert schema['paths']['/v1/usage']['post']['security'] == [{'HTTPBearer': []}]
+    assert 'security' not in schema['paths']['/health']['get']
+
+
+def test_revoked_key_is_rejected_after_restart(usage_client, monkeypatch):
+    _, factory, _ = usage_client
+    monkeypatch.setenv('API_KEYS', '{"bob":"bob-api-key"}')
+    with TestClient(app) as client:
+        response = client.post('/v1/usage', json={'username': 'alice', 'password': 'secret'},
+                               headers={'Authorization': 'Bearer alice-api-key'})
+    assert response.status_code == 401
+    factory.assert_not_called()
