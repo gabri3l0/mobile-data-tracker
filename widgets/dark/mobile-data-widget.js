@@ -5,6 +5,8 @@ const API_KEY = "";
 const USERNAME = "";
 const PASSWORD = "";
 const REQUEST_TIMEOUT_SECONDS = 20;
+const CACHE_MINUTES = 30;
+const RETRY_MINUTES = 15;
 
 // Set true for an offline preview; no API request is made in sample mode.
 const USE_SAMPLE_DATA = false;
@@ -40,11 +42,59 @@ async function loadUsage() {
       updateFailed: PREVIEW_STATE !== "success",
     };
   }
+  const now = Date.now();
+  const cache = readCache();
+  if (cache && cache.retryAt > now) {
+    return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
+  }
+  if (cache && cache.data && now - cache.fetchedAt < CACHE_MINUTES * 60000) {
+    return {
+      data: cache.data,
+      updateFailed: cache.updateFailed,
+      refreshAt: cache.fetchedAt + CACHE_MINUTES * 60000,
+    };
+  }
   try {
-    return { data: await fetchUsage(), updateFailed: false };
-  } catch {
+    const data = await fetchUsage();
+    const fetchedAt = Date.now();
+    writeCache({ data, fetchedAt, retryAt: 0, updateFailed: false });
+    return { data, updateFailed: false, refreshAt: fetchedAt + CACHE_MINUTES * 60000 };
+  } catch (error) {
     // Do not log request details, credentials, or the server's response body.
-    return { data: null, updateFailed: true };
+    const retryAt = error.retryAt || Date.now() + RETRY_MINUTES * 60000;
+    const data = cache ? cache.data : null;
+    writeCache({ data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true });
+    return { data, updateFailed: true, refreshAt: retryAt };
+  }
+}
+
+function cacheLocation() {
+  const files = FileManager.local();
+  // Separate account files. No password or bearer key is stored in the cache.
+  const name = `mobile-data-dark-${encodeURIComponent(USERNAME)}.json`;
+  return { files, path: files.joinPath(files.libraryDirectory(), name) };
+}
+
+function readCache() {
+  try {
+    const { files, path } = cacheLocation();
+    if (!files.fileExists(path)) return null;
+    const cache = JSON.parse(files.readString(path));
+    if (cache.source !== API_URL || !(cache.data === null || isUsageData(cache.data))
+      || !Number.isFinite(cache.fetchedAt) || cache.fetchedAt < 0 || cache.fetchedAt > Date.now()
+      || !Number.isFinite(cache.retryAt) || typeof cache.updateFailed !== "boolean") return null;
+    return cache;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(cache) {
+  try {
+    const { files, path } = cacheLocation();
+    files.writeString(path, JSON.stringify({ source: API_URL, ...cache }));
+  } catch {
+    // A storage failure should not hide a successful API reading.
   }
 }
 
@@ -61,9 +111,24 @@ async function fetchUsage() {
   };
   request.body = JSON.stringify({ username: USERNAME, password: PASSWORD });
   request.timeoutInterval = REQUEST_TIMEOUT_SECONDS;
-  const data = await request.loadJSON();
+  const body = await request.loadString();
   const status = request.response.statusCode;
-  if (status < 200 || status >= 300 || !isUsageData(data)) {
+  if (status === 429) {
+    const headers = request.response.headers || {};
+    const header = Object.keys(headers).find(key => key.toLowerCase() === "retry-after");
+    const value = header ? String(headers[header]).trim() : "";
+    const seconds = /^\d+$/.test(value) ? Number(value) : NaN;
+    const deadline = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(value);
+    const error = new Error("Usage limit reached.");
+    error.retryAt = Number.isFinite(deadline) && deadline > Date.now()
+      ? deadline : Date.now() + RETRY_MINUTES * 60000;
+    throw error;
+  }
+  if (status < 200 || status >= 300) {
+    throw new Error("Unable to retrieve usage data.");
+  }
+  const data = JSON.parse(body);
+  if (!isUsageData(data)) {
     throw new Error("Unable to retrieve usage data.");
   }
   return data;
@@ -138,8 +203,10 @@ function addText(stack, value, font, color) {
   return text;
 }
 
-function createWidget({ data, updateFailed }) {
+function createWidget({ data, updateFailed, refreshAt }) {
   const widget = new ListWidget();
+  // iOS decides the actual refresh time; this is only the earliest requested time.
+  if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
   widget.backgroundColor = new Color(COLORS.background);
   widget.setPadding(12, 12, 12, 12);
   // iOS applies the outer widget corner shape.
