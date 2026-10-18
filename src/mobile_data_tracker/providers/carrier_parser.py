@@ -1,10 +1,15 @@
+import logging
 import re
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def parse_usage(response: dict[str, object]) -> dict[str, object]:
     """Extract plan usage from the nested JSON returned by get_home."""
+    logger.debug("Parsing carrier home response.")
     if not isinstance(response, dict):
+        logger.error("Carrier home response must be a JSON object.")
         raise ValueError("Carrier home response must be a JSON object.")
 
     def find(obj, component_id: str):
@@ -25,12 +30,14 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
     def config(component_id: str) -> dict:
         result = find(response, component_id)
         if not isinstance(result, dict):
+            logger.error("Carrier home response is missing component %s.", component_id)
             raise ValueError(f"Carrier home response is missing {component_id}.")
         return result
 
     def get(component_id: str) -> str:
         value = config(component_id).get("value")
         if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+            logger.error("Carrier home response has an invalid value for %s.", component_id)
             raise ValueError(f"Carrier home response has an invalid value for {component_id}.")
         return str(value)
 
@@ -38,6 +45,7 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
         try:
             return float(get(component_id))
         except ValueError:
+            logger.error("Carrier home response has an invalid number for %s.", component_id)
             raise ValueError(
                 f"Carrier home response has an invalid number for {component_id}."
             ) from None
@@ -54,6 +62,7 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
             "%d/%m/%Y %H:%M"
         )
     except ValueError:
+        logger.error("Carrier home response has an invalid last-update-text date.")
         raise ValueError("Carrier home response has an invalid last-update-text date.") from None
 
     expiration = get("text-due-value")
@@ -70,6 +79,7 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
         if expiration_date < last_updated.date():
             expiration_date = expiration_date.replace(year=expiration_date.year + 1)
     except (KeyError, ValueError):
+        logger.error("Carrier home response has an invalid text-due-value date.")
         raise ValueError("Carrier home response has an invalid text-due-value date.") from None
 
     segments = config("tabs-plans-v2-limited-cutoff-message-0-0-0").get("segments")
@@ -77,14 +87,16 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
         isinstance(segment, dict) and isinstance(segment.get("text"), str)
         for segment in segments
     ):
+        logger.error("Carrier home response has invalid cutoff message segments.")
         raise ValueError("Carrier home response has invalid cutoff message segments.")
     message = "".join(s["text"] for s in segments)
     days_match = re.search(r"Faltan\s+(\d+)", message, re.IGNORECASE)
     if days_match is None:
+        logger.error("Carrier cutoff message is missing the number of days remaining.")
         raise ValueError("Carrier cutoff message is missing the number of days remaining.")
     days_until = int(days_match.group(1))
 
-    return {
+    usage = {
         "plan_name": plan,
         "expiration_date": expiration_date.isoformat(),
         "days_until": days_until,
@@ -95,3 +107,5 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
         "used_percentage": round(used / total * 100, 2) if total else None,
         "remaining_percentage": round(remaining / total * 100, 2) if total else None,
     }
+    logger.debug("Carrier usage parsed successfully.")
+    return usage
