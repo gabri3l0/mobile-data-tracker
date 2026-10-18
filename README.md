@@ -27,6 +27,12 @@ See your remaining data, plan expiration, and latest reading directly on your ho
 
 The current integration supports one carrier API format.
 
+## License
+
+[MIT](LICENSE): use, modify, and redistribute the code, including commercially,
+while keeping the copyright and license notice. The software comes without warranty.
+Third-party images and assets retain their respective licenses.
+
 ## Disclaimer
 
 This project is unofficial and is not affiliated with, endorsed by, or sponsored by the carrier.

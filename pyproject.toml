@@ -2,6 +2,8 @@
 name = "mobile-data-tracker"
 version = "0.1.0"
 description = "A mobile carrier API client for retrieving and parsing data usage"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 # Logging uses Python's standard library; no additional dependency is required.
 dependencies = [
