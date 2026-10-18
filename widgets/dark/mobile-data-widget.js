@@ -7,6 +7,7 @@ const SETTINGS = {
   username: "",
   password: "",
   cacheMinutes: 30,
+  debug: true,     // Safe diagnostics in the Scriptable console.
 };
 
 // Set true for an offline preview; no API request is made in sample mode.

@@ -7,14 +7,18 @@ async function loadUsage(settings) {
     wakeRetryMinutes: 2,
     cacheMinutes: 30,
     retryMinutes: 15,
+    debug: false,
     ...settings,
   };
+  debugLog(settings, "Script started.");
   const now = Date.now();
   const cache = readCache(settings);
   if (cache && cache.retryAt > now) {
+    debugLog(settings, `Retry paused until ${new Date(cache.retryAt).toISOString()}. Last failure: ${safeDiagnostic(cache.lastFailure)}.`);
     return { data: cache.data, updateFailed: true, connectionPending: cache.connectionPending === true, refreshAt: cache.retryAt };
   }
   if (cache && cache.data && now - cache.fetchedAt < settings.cacheMinutes * 60000) {
+    debugLog(settings, "Using fresh cache; no requests needed.");
     return {
       data: cache.data,
       updateFailed: cache.updateFailed,
@@ -24,35 +28,59 @@ async function loadUsage(settings) {
   }
   try {
     if (![settings.apiUrl, settings.healthUrl, settings.apiKey, settings.username, settings.password].every(value => typeof value === "string" && value.trim())) {
-      throw new Error("Configure the API settings in your local script.");
+      throw diagnosticError("configuration");
     }
     await checkServerReady(settings);
     const data = await fetchUsage(settings);
     const fetchedAt = Date.now();
     writeCache(settings, { data, fetchedAt, retryAt: 0, updateFailed: false, connectionPending: false });
+    debugLog(settings, "Usage received and validated.");
     return { data, updateFailed: false, connectionPending: false, refreshAt: fetchedAt + settings.cacheMinutes * 60000 };
   } catch (error) {
     // Do not log request details, credentials, or the server's response body.
     const retryAt = error.retryAt || Date.now() + settings.retryMinutes * 60000;
     const data = cache ? cache.data : null;
     const connectionPending = error.connectionPending === true;
-    writeCache(settings, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true, connectionPending });
+    const lastFailure = safeDiagnostic(error.diagnosticCode);
+    debugLog(settings, `Failed: ${lastFailure}. Retry after ${new Date(retryAt).toISOString()}.`);
+    writeCache(settings, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt, updateFailed: true, connectionPending, lastFailure });
     return { data, updateFailed: true, connectionPending, refreshAt: retryAt };
   }
 }
 
+function debugLog(settings, message) {
+  if (settings.debug) console.log(`[Usage] ${message}`);
+}
+
+function safeDiagnostic(code) {
+  return typeof code === "string" && /^(configuration|health_network|health_response|usage_network|usage_json|usage_data|(?:health|usage)_http_[1-5]\d{2})$/.test(code)
+    ? code : "unknown";
+}
+
+function diagnosticError(code) {
+  const error = new Error("Unable to retrieve usage data.");
+  error.diagnosticCode = safeDiagnostic(code);
+  return error;
+}
+
 async function checkServerReady(settings) {
+  debugLog(settings, "Checking health (one request).");
+  let reason = "health_network";
   try {
     const request = new Request(settings.healthUrl);
     request.method = "GET";
     request.timeoutInterval = settings.healthTimeoutSeconds;
     const body = await request.loadString();
     const status = request.response.statusCode;
-    if (status >= 200 && status < 300 && JSON.parse(body).status === "ok") return;
+    reason = status >= 200 && status < 300 ? "health_response" : `health_http_${status}`;
+    if (status >= 200 && status < 300 && JSON.parse(body).status === "ok") {
+      debugLog(settings, "Health ready.");
+      return;
+    }
   } catch {
     // One attempt only. Let a future widget execution check again.
   }
-  const error = new Error("Server is not ready.");
+  const error = diagnosticError(reason);
   error.connectionPending = true;
   error.retryAt = Date.now() + settings.wakeRetryMinutes * 60000;
   throw error;
@@ -68,13 +96,17 @@ function cacheLocation(settings) {
 function readCache(settings) {
   try {
     const { files, path } = cacheLocation(settings);
-    if (!files.fileExists(path)) return null;
+    if (!files.fileExists(path)) {
+      debugLog(settings, "No saved cache.");
+      return null;
+    }
     const cache = JSON.parse(files.readString(path));
     if (cache.source !== settings.apiUrl || !(cache.data === null || isUsageData(cache.data))
       || !Number.isFinite(cache.fetchedAt) || cache.fetchedAt < 0 || cache.fetchedAt > Date.now()
       || !Number.isFinite(cache.retryAt) || typeof cache.updateFailed !== "boolean") return null;
     return cache;
   } catch {
+    debugLog(settings, "Cache could not be read; treating it as missing.");
     return null;
   }
 }
@@ -85,13 +117,15 @@ function writeCache(settings, cache) {
     files.writeString(path, JSON.stringify({ source: settings.apiUrl, ...cache }));
   } catch {
     // A storage failure should not hide a successful API reading.
+    debugLog(settings, "Cache could not be saved.");
   }
 }
 
 async function fetchUsage(settings) {
   if (![settings.apiUrl, settings.apiKey, settings.username, settings.password].every(value => typeof value === "string" && value.trim())) {
-    throw new Error("Configure the API settings in your local script.");
+    throw diagnosticError("configuration");
   }
+  debugLog(settings, "Requesting usage (one POST).");
   const request = new Request(settings.apiUrl);
   request.method = "POST";
   request.headers = {
@@ -101,25 +135,36 @@ async function fetchUsage(settings) {
   };
   request.body = JSON.stringify({ username: settings.username, password: settings.password });
   request.timeoutInterval = settings.requestTimeoutSeconds;
-  const body = await request.loadString();
+  let body;
+  try {
+    body = await request.loadString();
+  } catch {
+    throw diagnosticError("usage_network");
+  }
   const status = request.response.statusCode;
+  debugLog(settings, `Usage response: ${safeDiagnostic(`usage_http_${status}`)}.`);
   if (status === 429) {
     const headers = request.response.headers || {};
     const header = Object.keys(headers).find(key => key.toLowerCase() === "retry-after");
     const value = header ? String(headers[header]).trim() : "";
     const seconds = /^\d+$/.test(value) ? Number(value) : NaN;
     const deadline = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(value);
-    const error = new Error("Usage limit reached.");
+    const error = diagnosticError("usage_http_429");
     error.retryAt = Number.isFinite(deadline) && deadline > Date.now()
       ? deadline : Date.now() + settings.retryMinutes * 60000;
     throw error;
   }
   if (status < 200 || status >= 300) {
-    throw new Error("Unable to retrieve usage data.");
+    throw diagnosticError(`usage_http_${status}`);
   }
-  const data = JSON.parse(body);
+  let data;
+  try {
+    data = JSON.parse(body);
+  } catch {
+    throw diagnosticError("usage_json");
+  }
   if (!isUsageData(data)) {
-    throw new Error("Unable to retrieve usage data.");
+    throw diagnosticError("usage_data");
   }
   return data;
 }

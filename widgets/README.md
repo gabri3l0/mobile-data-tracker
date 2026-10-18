@@ -74,3 +74,19 @@ It asks iOS to refresh later, but iOS controls the actual timing. You can also r
 - **Ejecutado:** when the script last ran, including cached results and failures.
 
 New data updates the card automatically. Code changes must be copied into Scriptable manually.
+
+## Troubleshooting
+
+Set `debug: true` inside the widget's `SETTINGS`, then run the design script from
+the Scriptable editor. Open the console to read messages starting with `[Usage]`.
+Update **usage-data** in Scriptable too when copying a newer version of the code.
+
+- **Using fresh cache:** no request was needed.
+- **Retry paused until…:** wait for that deadline before trying again. Times ending in `Z` are UTC.
+- **health_network / health_response:** the health check failed or returned an unexpected response.
+- **usage_http_401:** the API rejected the bearer key.
+- **usage_http_429:** the usage limit was reached.
+- **usage_network:** the usage request failed or timed out.
+- **usage_json / usage_data:** the response was not valid JSON or did not contain the expected fields.
+
+Logs omit URLs, credentials, and response bodies. Set `debug: false` to disable them.
