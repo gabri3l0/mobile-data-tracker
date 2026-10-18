@@ -1,16 +1,31 @@
 # Mobile Data Tracker
 
-Unofficial mobile data usage tracker with a Python API, CLI, and Scriptable widgets for iPhone.
+Track your mobile data usage through a Python API, CLI, and Scriptable widgets for iPhone.
+See your remaining data, plan expiration, and latest reading directly on your home screen.
 
-View remaining and used data, usage percentages, plan details, and expiration dates.
-The widgets keep the last successful reading available when an update fails.
+## Preview
+
+| Dark | Image 1 | Image 2 |
+| :---: | :---: | :---: |
+| [<img src="widgets/screenshots/dark.jpg" alt="Dark widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/dark/preview.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Image 1 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Image 2 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) |
+| [Open Dark preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/dark/preview.html) | [Open Image 1 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) | [Open Image 2 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) |
+
+## Features
+
+- Remaining and used data, with a usage progress bar.
+- Plan name, expiration date, and days remaining.
+- Dark and customizable image-background widgets.
+- Cached readings available when updates fail.
+- Separate timestamps for usage readings and script execution.
+- Bearer-protected API with limits per person.
+- CLI access and browser previews.
 
 ## Guides
 
-- [Backend](docs/backend.md): setup, CLI, API keys, endpoints, rate limits, Bruno, and tests.
-- [iPhone widgets](widgets/README.md): browser previews, Scriptable setup, and automatic refresh.
+- [Backend](docs/backend.md) — setup, CLI, API, authentication, and tests.
+- [iPhone widgets](widgets/README.md) — designs, Scriptable setup, and refresh behavior.
 
-The current integration supports one carrier API format. Changing endpoints alone does not add support for another carrier.
+The current integration supports one carrier API format.
 
 ## Disclaimer
 
