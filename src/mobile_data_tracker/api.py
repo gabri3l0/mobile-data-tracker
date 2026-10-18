@@ -1,6 +1,9 @@
 import logging
+import math
 from dataclasses import replace
 from datetime import date, datetime
+from threading import Lock
+from time import monotonic
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -45,7 +48,36 @@ class UsageResponse(BaseModel):
     used_percentage: float | None
     remaining_percentage: float | None
 
+
+class UsageRateLimiter:
+    """Two attempts per caller in a rolling 15-minute window, per process."""
+
+    def __init__(self) -> None:
+        self._attempts: dict[str, list[float]] = {}
+        self._lock = Lock()
+
+    def check(self, caller: str) -> None:
+        with self._lock:
+            now = monotonic()
+            # Discard inactive callers so their entries do not accumulate forever.
+            self._attempts = {
+                key: recent
+                for key, attempts in self._attempts.items()
+                if (recent := [timestamp for timestamp in attempts if timestamp > now - 900])
+            }
+            attempts = self._attempts.setdefault(caller, [])
+            if len(attempts) >= 2:
+                retry_after = max(1, math.ceil(attempts[0] + 900 - now))
+                raise HTTPException(
+                    status_code=429,
+                    detail="Usage limit reached. Try again later.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+            attempts.append(now)
+
+
 app = FastAPI(title="Mobile Data Tracker")
+usage_limiter = UsageRateLimiter()
 
 
 @app.exception_handler(RequestValidationError)
@@ -68,7 +100,9 @@ def health() -> dict[str, str]:
 
 
 @app.post("/v1/usage", response_model=UsageResponse)
-def get_usage(credentials: UsageRequest) -> UsageResponse:
+def get_usage(credentials: UsageRequest, request: Request) -> UsageResponse:
+    caller = request.client.host if request.client else "unknown"
+    usage_limiter.check(caller)
     tracker = None
     try:
         config = replace(
