@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dark widget · Preview</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #242428; background: #f6f4f2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 48px 24px; }
+    main { max-width: 760px; margin: auto; }
+    .eyebrow { color: #8b5551; font-size: 11px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.04em; margin: 12px 0; font-weight: 650; }
+    .intro, .note { color: #747177; font-size: 13px; line-height: 1.6; }
+    .toolbar { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin: 28px 0 18px; align-items: center; }
+    .states { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid #e0dcd8; border-radius: 12px; }
+    button { border: 0; border-radius: 8px; padding: 9px 12px; background: transparent; color: #6c676c; font: inherit; font-size: 12px; cursor: pointer; }
+    button[aria-pressed="true"] { background: white; color: #242428; box-shadow: 0 1px 4px #241a1512; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #d94137; outline-offset: 3px; }
+    .zoom { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #747177; }
+    input { width: 80px; accent-color: #d94137; }
+    .stage { min-height: 470px; display: grid; place-items: center; border: 1px solid #e7e0dc; border-radius: 24px; background: radial-gradient(ellipse at 48% 55%, #ead7d0 0, #eee5df 38%, #f1ece7 80%); padding: 24px; overflow: auto; }
+    .frame { width: 340px; height: 340px; flex-shrink: 0; }
+    .card { width: 170px; height: 170px; padding: 12px; border-radius: 22px; background: #101012; color: white; display: flex; flex-direction: column; transform: scale(2); transform-origin: top left; box-shadow: 0 12px 24px #2d1e1920; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .header { display: flex; gap: 6px; align-items: center; justify-content: space-between; height: 14px; flex-shrink: 0; }
+    .title { max-width: 96px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: -.3px; }
+    .badge { flex-shrink: 0; font-size: 8px; font-weight: 700; color: #ff453a; }
+    .usage { margin-top: 3px; }
+    .reading { display: flex; gap: 4px; align-items: baseline; height: 38px; }
+    .value { font-size: 34px; line-height: 38px; letter-spacing: -1.4px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .unit { font-size: 14px; font-weight: 500; color: #929298; }
+    .available { font-size: 10px; line-height: 12px; color: #929298; }
+    .track { width: 112px; height: 7px; border-radius: 4px; overflow: hidden; background: #2c2c30; margin-top: 3px; }
+    .fill { height: 100%; background: #ff453a; border-radius: inherit; }
+    .percentage { margin-top: 3px; font-size: 9px; line-height: 11px; color: #929298; }
+    .footer { margin-top: auto; color: #929298; }
+    .expiration { font-size: 9px; line-height: 11px; }
+    .timestamp { font-size: 8px; line-height: 10px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .execution { flex-shrink: 0; font-size: 7px; line-height: 9px; margin-top: 3px; color: #929298; font-variant-numeric: tabular-nums; }
+    .warning { color: #ff453a; font-size: 8px; line-height: 10px; margin-top: 3px; white-space: pre-line; }
+    .connecting .usage { margin-top: 3px; }
+    .connecting .value { font-size: 32px; }
+    .connecting .reading { height: 36px; }
+    .connecting .track { margin-top: 3px; }
+    .empty { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+    .empty strong { font-size: 13px; }
+    .empty span { font-size: 11px; color: #929298; }
+    [hidden] { display: none !important; }
+    .note { margin: 16px 0 0; }
+    @media (max-width: 420px) { body { padding: 28px 14px; } .stage { padding: 16px; min-height: 400px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Widget study / Dark</div>
+    <h1>Dark widget</h1>
+    <p class="intro">Small widget · Sample data only · No API connection</p>
+    <div class="toolbar">
+      <div class="states" role="group" aria-label="Preview state">
+        <button data-state="success" aria-pressed="true">Success</button>
+        <button data-state="stale" aria-pressed="false">Update failed</button>
+        <button data-state="error" aria-pressed="false">No saved data</button>
+        <button data-state="connecting" aria-pressed="false">Connecting · saved</button>
+        <button data-state="connecting-empty" aria-pressed="false">Connecting · empty</button>
+      </div>
+      <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale">2×</output></label>
+    </div>
+    <div class="stage">
+      <div class="frame" id="frame">
+        <article class="card" id="card" lang="es" aria-label="Vista previa del consumo de datos">
+          <header class="header"><span class="title" id="plan">Consumo</span><span class="badge">Telcel</span></header>
+          <section class="usage" id="usage">
+            <div class="reading"><span class="value" id="remaining"></span><span class="unit">GB</span></div>
+            <div class="available" id="available"></div>
+            <div class="track" role="progressbar" aria-label="Datos utilizados" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="fill" id="fill"></div></div>
+            <div class="percentage" id="percentage"></div>
+          </section>
+          <footer class="footer" id="footer">
+            <div class="expiration" id="expiration"></div>
+            <div class="timestamp" id="timestamp"></div>
+            <div class="warning" id="warning" hidden>No se pudo actualizar</div>
+          </footer>
+          <section class="empty" id="empty" hidden><strong id="empty-title">No se pudo cargar</strong><span id="empty-detail">Intenta más tarde</span></section>
+          <div class="execution" id="execution"></div>
+        </article>
+      </div>
+    </div>
+    <p class="note">Double-click this file to preview. Change the sample values below in the source to explore another reading. Browser typography approximates iOS; confirm the final layout in Scriptable. The .js file draws the iPhone widget; install usage-data.js alongside it for live data.</p>
+  </main>
+  <script>
+    const RUN_AT = new Date();
+    // Same fixture as mobile-data-widget.js. No credentials or network requests.
+    const SAMPLE_DATA = {
+      plan_name: "Plan 7 GB",
+      expiration_date: "2026-10-24",
+      days_until: 5,
+      last_updated: "2026-10-18T01:30:00",
+      total_gb: 7.0,
+      used_gb: 5.4,
+      remaining_gb: 1.6,
+      used_percentage: 77.14,
+      remaining_percentage: 22.86,
+    };
+
+    // Keep the data boundary separate so a future loader can supply this shape.
+    function render({ data, updateFailed, connectionPending = false }) {
+      const pad = value => String(value).padStart(2, "0");
+      document.getElementById("execution").textContent = `Ejecutado · ${pad(RUN_AT.getDate())}/${pad(RUN_AT.getMonth() + 1)}/${String(RUN_AT.getFullYear()).slice(-2)} ${pad(RUN_AT.getHours())}:${pad(RUN_AT.getMinutes())}`;
+      document.getElementById("card").classList.toggle("connecting", connectionPending);
+      document.getElementById("plan").textContent = data && data.plan_name ? data.plan_name : "Consumo";
+      document.getElementById("empty-title").textContent = connectionPending ? "Iniciando conexión" : "No se pudo cargar";
+      document.getElementById("empty-detail").textContent = connectionPending ? "Reintenta en 2 min" : "Intenta más tarde";
+      document.getElementById("usage").hidden = !data;
+      document.getElementById("footer").hidden = !data;
+      document.getElementById("empty").hidden = Boolean(data);
+      if (!data) return;
+      const used = Math.min(100, Math.max(0, data.used_percentage));
+      document.getElementById("remaining").textContent = data.remaining_gb.toFixed(1);
+      document.getElementById("available").textContent = `disponibles de ${data.total_gb.toFixed(1)} GB`;
+      document.getElementById("fill").style.width = `${used}%`;
+      document.getElementById("progress").setAttribute("aria-valuenow", String(used));
+      document.getElementById("percentage").textContent = `${Math.round(used)}% utilizado`;
+      document.getElementById("expiration").hidden = data.expiration_date === null;
+      if (data.expiration_date !== null) {
+        const [, month, day] = data.expiration_date.split("-");
+        const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        document.getElementById("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
+      }
+      const [date, time] = data.last_updated.split("T");
+      const [year, readingMonth, readingDay] = date.split("-");
+      document.getElementById("timestamp").textContent = `Actualizado · ${readingDay}/${readingMonth}/${year.slice(-2)} ${time.slice(0, 5)}`;
+      document.getElementById("warning").hidden = !updateFailed;
+      document.getElementById("warning").textContent = connectionPending
+        ? "Iniciando conexión\nReintenta en 2 min" : "No se pudo actualizar";
+    }
+
+    document.querySelectorAll("[data-state]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-state]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+        const state = button.dataset.state;
+        render({
+          data: ["error", "connecting-empty"].includes(state) ? null : SAMPLE_DATA,
+          updateFailed: state !== "success",
+          connectionPending: state.startsWith("connecting"),
+        });
+      });
+    });
+    document.getElementById("zoom").addEventListener("input", event => {
+      const scale = Number(event.target.value);
+      document.getElementById("card").style.transform = `scale(${scale})`;
+      document.getElementById("frame").style.width = `${170 * scale}px`;
+      document.getElementById("frame").style.height = `${170 * scale}px`;
+      document.getElementById("scale").textContent = `${scale}×`;
+    });
+    render({ data: SAMPLE_DATA, updateFailed: false });
+  </script>
+</body>
+</html>
