@@ -12,6 +12,7 @@ const SETTINGS = {
   username: "",
   password: "",
   cacheMinutes: 30,
+  debug: true,     // Safe diagnostics in the Scriptable console.
 };
 
 // Sample mode skips the usage API. The background URL may still be loaded.
