@@ -5,13 +5,12 @@ from mobile_data_tracker.providers.carrier import CarrierError
 
 
 @pytest.mark.parametrize("level", ["INFO", "DEBUG"])
-def test_username_only_appears_at_debug(carrier, caplog, level):
+def test_credentials_are_omitted_from_logs(carrier, caplog, level):
     carrier.payload = {"estatus": "ok", "token": "private-token"}
     with caplog.at_level(level, logger="mobile_data_tracker"):
         assert carrier.provider.login() == "private-token"
     assert "Carrier login successful" in caplog.text
-    assert ("test-user" in caplog.text) == (level == "DEBUG")
-    for secret in ("test-password", "private-token", "carrier.example"):
+    for secret in ("test-user", "test-password", "private-token", "carrier.example"):
         assert secret not in caplog.text
 
 
