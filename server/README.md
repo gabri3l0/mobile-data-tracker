@@ -3,15 +3,21 @@
 Python CLI and FastAPI service for reading mobile data usage. Its goal is to track
 family accounts and provide daily consumption, history, and trends.
 
-Currently supports one carrier format and one account per request. Saved accounts,
+Currently supports Telcel and one account per request. Saved accounts,
 scheduled collection, and analytics are planned.
 
 ## Folder structure
 
 ```text
 server/
-├── src/             API, usage client, and configuration
-│   └── providers/   Carrier requests and response parsing
+├── src/
+│   ├── api/         App, routes, schemas, authentication, limits, and errors
+│   ├── providers/
+│   │   ├── base.py     Common provider interface
+│   │   └── telcel/     Telcel provider, parser, and configuration
+│   ├── client.py    Carrier selection and shared usage client
+│   ├── models.py    Carrier names and normalized usage type
+│   └── exceptions.py  Shared carrier errors
 ├── tests/           Mocked regression tests
 ├── scripts/         API-key generation
 ├── bruno/           Manual API testing template
@@ -53,7 +59,6 @@ carrier accounts.
 Keys do not expire. Restart the server after adding, replacing, or removing keys.
 Keep credentials private and use HTTPS when hosting the API.
 
-
 ## Setup
 
 Requires Python 3.11+ and UV. From the repository root:
@@ -64,19 +69,20 @@ uv sync
 cp .env.example .env
 ```
 
-Fill in `.env` using the descriptions in [.env.example](.env.example).
+Configure Telcel with the `TELCEL_*` variables in [.env.example](.env.example).
 Run the commands below from `server/`.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `uv run python main.py` | Print usage for the carrier account in `.env`. |
+| `uv run python main.py --carrier telcel` | Print usage for the carrier account in `.env`. |
 | `uv run python scripts/create_token.py` | Generate an API key. |
-| `uv run uvicorn src.api:app --reload` | Start the API locally. |
+| `uv run uvicorn src.api.app:app --reload` | Start the API locally. |
 | `uv run pytest -v` | Run tests without real credentials or carrier requests. |
 
-The usage CLI needs carrier settings but no API key. API rate limits apply only
+The CLI defaults to Telcel when `--carrier` is omitted. It reads `TELCEL_*`
+settings from `.env` and needs no API key. API rate limits apply only
 to HTTP requests. Set `LOG_LEVEL=DEBUG` for detailed CLI logs.
 
 ## Endpoints
@@ -86,15 +92,17 @@ Local base URL: `http://127.0.0.1:8000`.
 | Method | Path | API key | Purpose |
 | --- | --- | --- | --- |
 | GET | `/health` | No | Server health; does not contact the carrier. |
-| POST | `/v1/usage` | Yes | Current usage for the submitted account. |
+| POST | `/v1/usage` | Yes | Current usage for the selected carrier and account. |
 | GET | `/docs` | No | Interactive API documentation. |
 | GET | `/redoc` | No | Alternative API documentation. |
 | GET | `/openapi.json` | No | OpenAPI schema. |
 
-Send this JSON body to `POST /v1/usage`:
+Send this JSON body to `POST /v1/usage`. The `carrier` field is required;
+only `telcel` is currently supported:
 
 ```json
 {
+  "carrier": "telcel",
   "username": "<phone-number>",
   "password": "<carrier-password>"
 }
@@ -116,9 +124,17 @@ Use `{{base_url}}/v1/usage` with bearer token `{{api_key}}` and this body:
 
 ```json
 {
+  "carrier": "telcel",
   "username": "{{username}}",
   "password": "{{password}}"
 }
 ```
 
 Keep the template blank. Reimport the schema after API changes.
+
+## Adding a carrier
+
+Add its `provider.py`, `parser.py`, and `config.py` under `src/providers/<name>/`.
+The provider implements `get_usage_data()` and `close()`, owns its authentication
+flow, and returns the shared `UsageData` fields. Add carrier selection in the shared client and
+`CarrierName`, and add tests. Bait is planned but not implemented yet.

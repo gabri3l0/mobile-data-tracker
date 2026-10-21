@@ -1,9 +1,6 @@
-from unittest.mock import Mock
-
 import pytest
 
-from src.client import MobileDataTracker
-from src.providers.carrier_parser import parse_usage
+from src.providers.telcel.parser import parse_usage
 
 
 def test_nested_home_response(home_response):
@@ -43,19 +40,3 @@ def test_malformed_fields(home_response, index, config, error):
     home_response["data"]["components"][index]["config"] = config
     with pytest.raises(ValueError, match=error):
         parse_usage(home_response)
-
-
-def test_client_parses_provider_home_response(home_response):
-    provider = Mock()
-    provider.login.return_value = "login-token"
-    provider.get_access_token.return_value = "access-token"
-    provider.get_home.return_value = home_response
-    tracker = MobileDataTracker(provider)
-    try:
-        result = tracker.get_usage_data()
-    finally:
-        tracker.close()
-    assert result["remaining_gb"] == 15.0
-    provider.get_access_token.assert_called_once_with(login_token="login-token")
-    provider.get_home.assert_called_once_with(access_token="access-token")
-    provider.close.assert_called_once_with()

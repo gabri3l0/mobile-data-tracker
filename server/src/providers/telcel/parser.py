@@ -2,12 +2,14 @@ import logging
 import re
 from datetime import datetime
 
+from src.models import UsageData
+
 logger = logging.getLogger(__name__)
 
 
-def parse_usage(response: dict[str, object]) -> dict[str, object]:
+def parse_usage(response: dict[str, object]) -> UsageData:
     """Extract plan usage from the nested JSON returned by get_home."""
-    logger.debug("Parsing carrier home response.")
+    logger.debug("Parsing Telcel home response.")
     if not isinstance(response, dict):
         logger.error("Carrier home response must be a JSON object.")
         raise ValueError("Carrier home response must be a JSON object.")
@@ -96,7 +98,7 @@ def parse_usage(response: dict[str, object]) -> dict[str, object]:
         raise ValueError("Carrier cutoff message is missing the number of days remaining.")
     days_until = int(days_match.group(1))
 
-    usage = {
+    usage: UsageData = {
         "plan_name": plan,
         "expiration_date": expiration_date.isoformat(),
         "days_until": days_until,

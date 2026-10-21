@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from src.providers.carrier import CarrierError
+from src.exceptions import CarrierError
 
 
 @pytest.mark.parametrize("level", ["INFO", "DEBUG"])
@@ -9,7 +9,7 @@ def test_raw_response_and_endpoint_are_only_logged_at_debug(carrier, caplog, lev
     carrier.payload = {"estatus": "ok", "token": "private-token"}
     with caplog.at_level(level, logger="src"):
         assert carrier.provider.login() == "private-token"
-    assert "Carrier login successful" in caplog.text
+    assert "Telcel login successful" in caplog.text
     for secret in ("test-user", "test-password"):
         assert secret not in caplog.text
     for detail in ("private-token", "https://carrier.example/login"):

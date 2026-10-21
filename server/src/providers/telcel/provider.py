@@ -3,24 +3,21 @@ import logging
 
 import httpx
 
-from src.models import CarrierConfig
+from src.exceptions import CarrierError, CarrierTimeoutError
+from src.models import UsageData
+from src.providers.telcel.config import TelcelConfig
+from src.providers.telcel.parser import parse_usage
 
 logger = logging.getLogger(__name__)
 
 
-class CarrierError(Exception):
-    """An API failure with credentials and request URLs omitted."""
+class TelcelProvider:
+    """Own Telcel authentication, retrieval, and usage normalization."""
 
-
-class CarrierTimeoutError(CarrierError):
-    """The carrier did not respond within the configured timeout."""
-
-
-class CarrierProvider:
-    def __init__(self, config: CarrierConfig) -> None:
+    def __init__(self, config: TelcelConfig) -> None:
         self.config = config
         self._http = httpx.Client(timeout=30.0, verify=True)
-        logger.debug("Carrier HTTP client initialized.")
+        logger.debug("Telcel HTTP client initialized.")
 
     @staticmethod
     def _require(**values: str) -> None:
@@ -30,42 +27,42 @@ class CarrierProvider:
             raise ValueError(f"Missing required configuration: {', '.join(missing)}")
 
     def _request(self, method: str, url: str, **kwargs) -> dict[str, object]:
-        logger.debug("Sending carrier %s request.", method)
-        error = "Carrier request failed."
+        logger.debug("Sending Telcel %s request.", method)
+        error = "Telcel request failed."
         error_type = CarrierError
         try:
             response = self._http.request(method, url, **kwargs)
             logger.debug(
-                "Carrier response from %s (HTTP %s): %s",
+                "Telcel response from %s (HTTP %s): %s",
                 url, response.status_code, response.text,
             )
             response.raise_for_status()
             result = response.json()
             if isinstance(result, dict):
-                logger.debug("Carrier request completed (HTTP %s).", response.status_code)
+                logger.debug("Telcel request completed (HTTP %s).", response.status_code)
                 return result
-            error = "Carrier returned a JSON value that is not an object."
+            error = "Telcel returned a JSON value that is not an object."
         except httpx.HTTPStatusError as exc:
-            error = f"Carrier request failed (HTTP {exc.response.status_code})."
+            error = f"Telcel request failed (HTTP {exc.response.status_code})."
         except httpx.TimeoutException:
-            error = "Carrier request timed out."
+            error = "Telcel request timed out."
             error_type = CarrierTimeoutError
         except httpx.RequestError:
-            error = "Carrier request failed due to a connection or timeout error."
+            error = "Telcel request failed due to a connection or timeout error."
         except (ValueError, httpx.InvalidURL):
-            error = "Invalid request URL or carrier JSON response."
+            error = "Invalid request URL or Telcel JSON response."
         # Raise outside the handler to avoid retaining a sensitive HTTP exception.
         logger.error("%s", error)
         raise error_type(error)
 
     def login(self) -> str:
-        logger.info("Trying to log in to the carrier.")
+        logger.info("Trying to log in to Telcel.")
         config = self.config
         self._require(
-            CARRIER_USERNAME=config.username,
-            CARRIER_PASSWORD=config.password,
-            CARRIER_SITE_DOMAIN=config.site_domain,
-            CARRIER_LOGIN_URL=config.login_url,
+            TELCEL_USERNAME=config.username,
+            TELCEL_PASSWORD=config.password,
+            TELCEL_SITE_DOMAIN=config.site_domain,
+            TELCEL_LOGIN_URL=config.login_url,
         )
         response = self._request("POST", config.login_url, follow_redirects=True, data={
             "username": config.username,
@@ -75,24 +72,24 @@ class CarrierProvider:
             "sitedomain": config.site_domain,
         })
         if response.get("estatus") != "ok":
-            logger.error("Carrier login rejected.")
+            logger.error("Telcel login rejected.")
             raise CarrierError("Login failed.")
 
         token = response.get("token")
         if not isinstance(token, str) or not token.strip():
             logger.error("Login response is missing a valid token.")
             raise CarrierError("Login response is missing a valid token.")
-        logger.info("Carrier login successful.")
+        logger.info("Telcel login successful.")
         return token
 
     def get_access_token(self, *, login_token: str) -> str:
-        logger.info("Retrieving carrier access token.")
+        logger.info("Retrieving Telcel access token.")
         config = self.config
         self._require(
-            CARRIER_USERNAME=config.username,
-            CARRIER_BASIC_AUTH=config.basic_auth,
-            CARRIER_SCOPE=config.scope,
-            CARRIER_TOKEN_URL=config.token_url,
+            TELCEL_USERNAME=config.username,
+            TELCEL_BASIC_AUTH=config.basic_auth,
+            TELCEL_SCOPE=config.scope,
+            TELCEL_TOKEN_URL=config.token_url,
             login_token=login_token,
         )
         response = self._request(
@@ -110,7 +107,7 @@ class CarrierProvider:
             },
         )
         if response.get("message") != "Éxito.":
-            logger.error("Carrier access token retrieval failed.")
+            logger.error("Telcel access token retrieval failed.")
             raise CarrierError("Failed to get access token.")
 
         token_response = response.get("tokenResponse")
@@ -125,15 +122,15 @@ class CarrierProvider:
         if not isinstance(token, str) or not token.strip():
             logger.error("Access token response is missing a valid token.")
             raise CarrierError("Access token response is missing a valid token.")
-        logger.info("Carrier access token retrieved successfully.")
+        logger.info("Telcel access token retrieved successfully.")
         return token
 
     def get_home(self, *, access_token: str) -> dict[str, object]:
-        logger.info("Retrieving carrier home data.")
+        logger.info("Retrieving Telcel home data.")
         config = self.config
         self._require(
-            CARRIER_USERNAME=config.username,
-            CARRIER_HOME_URL=config.home_url,
+            TELCEL_USERNAME=config.username,
+            TELCEL_HOME_URL=config.home_url,
             bearer_token=access_token,
         )
         response = self._request(
@@ -141,10 +138,15 @@ class CarrierProvider:
             params={"externalCode": config.username},
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        logger.info("Carrier home data retrieved successfully.")
+        logger.info("Telcel home data retrieved successfully.")
         return response
 
+    def get_usage_data(self) -> UsageData:
+        login_token = self.login()
+        access_token = self.get_access_token(login_token=login_token)
+        return parse_usage(self.get_home(access_token=access_token))
+
     def close(self) -> None:
-        logger.debug("Closing carrier HTTP connections.")
+        logger.debug("Closing Telcel HTTP connections.")
         self._http.close()
-        logger.debug("Carrier HTTP connections closed.")
+        logger.debug("Telcel HTTP connections closed.")

@@ -1,22 +1,18 @@
-import os
-from dataclasses import dataclass, fields
+from typing import Literal, TypedDict
 
 
-@dataclass(frozen=True, repr=False)
-class CarrierConfig:
-    username: str = ""
-    password: str = ""
-    basic_auth: str = ""
-    site_domain: str = ""
-    scope: str = ""
-    login_url: str = ""
-    token_url: str = ""
-    home_url: str = ""
+CarrierName = Literal["telcel"]
 
-    @classmethod
-    def from_env(cls) -> "CarrierConfig":
-        return cls(**{
-            field.name: os.environ[f"CARRIER_{field.name.upper()}"]
-            for field in fields(cls)
-            if f"CARRIER_{field.name.upper()}" in os.environ
-        })
+
+class UsageData(TypedDict):
+    """Carrier-independent usage; dates use ISO strings without timezone conversion."""
+
+    plan_name: str
+    expiration_date: str
+    days_until: int
+    last_updated: str
+    total_gb: float
+    used_gb: float
+    remaining_gb: float
+    used_percentage: float | None
+    remaining_percentage: float | None

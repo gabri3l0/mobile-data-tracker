@@ -1,38 +1,39 @@
+import argparse
 import logging
 import os
+from typing import get_args
 
 from dotenv import load_dotenv
 
 from src.client import MobileDataTracker
-from src.models import CarrierConfig
-from src.providers.carrier import CarrierProvider
+from src.models import CarrierName
 
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Read current mobile data usage.")
+    parser.add_argument("--carrier", choices=get_args(CarrierName), default="telcel")
+    args = parser.parse_args(argv)
     load_dotenv()
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    # Silence HTTP library logs, even in DEBUG mode, to avoid exposing endpoints
-    # or tokens in URLs and headers. CRITICAL + 1 blocks all standard log levels;
-    # our application's own logs remain enabled.
     for name in ("httpx", "httpcore"):
         logging.getLogger(name).setLevel(logging.CRITICAL + 1)
 
     logger.info("Starting mobile data tracker.")
-    tracker = MobileDataTracker(CarrierProvider(CarrierConfig.from_env()))
     try:
-        print(tracker.get_usage_data())
+        tracker = MobileDataTracker(carrier=args.carrier)
+        try:
+            print(tracker.get_usage_data())
+        finally:
+            tracker.close()
     except Exception:
-        # Exception text and tracebacks may include sensitive request details.
         logger.error("Unable to retrieve usage data.")
         raise SystemExit(1) from None
-    finally:
-        tracker.close()
-        logger.info("Mobile data tracker stopped.")
+    logger.info("Mobile data tracker stopped.")
 
 
 if __name__ == "__main__":
