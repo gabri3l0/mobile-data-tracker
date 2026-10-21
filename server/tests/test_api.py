@@ -219,7 +219,7 @@ def test_revoked_key_is_rejected_after_restart(usage_client, monkeypatch):
     constructor.assert_not_called()
 
 
-@pytest.mark.parametrize("carrier", [None, "bait", "unknown", "", 123])
+@pytest.mark.parametrize("carrier", [None, "unknown", "", 123])
 def test_carrier_is_required_and_must_be_supported(usage_client, carrier):
     client, constructor, _ = usage_client
     body = {"username": "alice", "password": "private-password"}
@@ -255,11 +255,13 @@ def test_cleanup_failure_is_sanitized(usage_client):
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_openapi_requires_carrier_and_exposes_only_telcel():
+def test_openapi_requires_carrier_and_exposes_telcel_and_bait():
     with TestClient(app) as client:
         schema = client.get("/openapi.json").json()["components"]["schemas"]["UsageRequest"]
     assert "carrier" in schema["required"]
-    assert schema["properties"]["carrier"]["const"] == "telcel"
+    assert schema["properties"]["carrier"]["enum"] == ["telcel", "bait"]
+    assert "username" in schema["required"]
+    assert "password" not in schema["required"]
 
 
 def test_usage_endpoint_runs_real_telcel_provider_with_mocked_http(carrier, home_response, monkeypatch):
@@ -278,7 +280,126 @@ def test_usage_endpoint_runs_real_telcel_provider_with_mocked_http(carrier, home
             "carrier": "telcel", "username": "alice", "password": "secret",
         })
     assert response.status_code == 200
-    assert response.json() == parse_usage(home_response)
+    assert response.json() == {**parse_usage(home_response), "data_tier": None}
     assert [r.url.path for r in carrier.requests] == ["/login", "/token", "/home", "/revoke"]
     assert carrier.requests[1].url.params["user"] == "alice"
     assert carrier.http.is_closed
+
+
+@pytest.mark.parametrize("tier", ["high_speed", "throttled"])
+def test_bait_endpoint_runs_real_client_without_password(bait, monkeypatch, tier):
+    from datetime import datetime, timezone
+    from src.api.schemas import UsageResponse
+    from src.providers.bait.config import BaitConfig
+    from src.providers.bait.parser import parse_usage as parse_bait
+
+    monkeypatch.setattr(BaitConfig, "from_env", lambda: bait.provider.config)
+    if tier == "throttled":
+        bait.payload["data"][0]["resume"]["unused"] = 0
+    before = datetime.now(timezone.utc)
+    with TestClient(app, headers={"Authorization": "Bearer alice-api-key"}) as client:
+        response = client.post("/v1/usage", json={"carrier": "bait", "username": "5587654321"})
+    after = datetime.now(timezone.utc)
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    usage = response.json()
+    fetched_at = datetime.fromisoformat(usage["last_updated"].replace("Z", "+00:00"))
+    assert before <= fetched_at <= after
+    assert usage == UsageResponse(**parse_bait(bait.payload, fetched_at=fetched_at)).model_dump(mode="json")
+    assert usage["data_tier"] == tier
+    request, = bait.requests
+    assert request.url.path.endswith("/5587654321/get/consumption")
+    assert request.headers["x-ord-service"] == "private-service-key"
+    assert bait.http.is_closed
+
+
+@pytest.mark.parametrize("password", [None, "", "unused-password"])
+def test_bait_password_is_optional_and_not_forwarded(usage_client, password):
+    client, constructor, _ = usage_client
+    response = client.post("/v1/usage", json={
+        "carrier": "bait", "username": "5512345678", "password": password,
+    })
+    assert response.status_code == 200
+    constructor.assert_called_once_with(carrier="bait", username="5512345678", password=None)
+
+
+@pytest.mark.parametrize("password", [None, "", "   "])
+def test_telcel_still_requires_nonempty_password(usage_client, password):
+    client, constructor, _ = usage_client
+    response = client.post("/v1/usage", json={
+        "carrier": "telcel", "username": "alice", "password": password,
+    })
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Invalid request body."}
+    constructor.assert_not_called()
+    assert app.state.usage_limiter._attempts == {}
+
+
+@pytest.mark.parametrize("username", [None, "", "   ", 123])
+def test_bait_requires_nonempty_string_phone(usage_client, username):
+    client, constructor, _ = usage_client
+    response = client.post("/v1/usage", json={"carrier": "bait", "username": username})
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Invalid request body."}
+    constructor.assert_not_called()
+    assert app.state.usage_limiter._attempts == {}
+
+
+def test_usage_limit_is_shared_across_carriers(usage_client):
+    client, constructor, _ = usage_client
+    assert client.post("/v1/usage", json={
+        "carrier": "telcel", "username": "alice", "password": "secret",
+    }).status_code == 200
+    assert client.post("/v1/usage", json={"carrier": "bait", "username": "5512345678"}).status_code == 200
+    response = client.post("/v1/usage", json={"carrier": "bait", "username": "5587654321"})
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
+    assert response.headers["cache-control"] == "no-store"
+    assert constructor.call_count == 2
+
+
+def test_bait_requires_api_authentication(usage_client):
+    client, constructor, _ = usage_client
+    response = client.post("/v1/usage", json={"carrier": "bait", "username": "5512345678"},
+                           headers={"Authorization": "Bearer invalid-key"})
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+    constructor.assert_not_called()
+    assert app.state.usage_limiter._attempts == {}
+
+
+def test_missing_bait_key_returns_sanitized_error_and_closes_client(bait, monkeypatch):
+    from dataclasses import replace
+    from src.providers.bait.config import BaitConfig
+
+    monkeypatch.setattr(BaitConfig, "from_env", lambda: replace(bait.provider.config, service_key=""))
+    with TestClient(app, headers={"Authorization": "Bearer alice-api-key"}) as client:
+        response = client.post("/v1/usage", json={"carrier": "bait", "username": "5512345678"})
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Unable to retrieve carrier usage."}
+    assert response.headers["cache-control"] == "no-store"
+    assert bait.requests == []
+    assert bait.http.is_closed
+
+
+@pytest.mark.parametrize("failure", ["http", "timeout", "parsing"])
+def test_bait_failure_is_sanitized_and_closes_http(bait, monkeypatch, failure):
+    import httpx
+    from unittest.mock import Mock
+    from src.providers.bait.config import BaitConfig
+
+    monkeypatch.setattr(BaitConfig, "from_env", lambda: bait.provider.config)
+    if failure == "http":
+        bait.status = 401
+        bait.content = b"private-details"
+    elif failure == "timeout":
+        monkeypatch.setattr(bait.http, "get", Mock(side_effect=httpx.ReadTimeout("private-details")))
+    else:
+        bait.payload = {"success": False, "message": "private-details"}
+    with TestClient(app, headers={"Authorization": "Bearer alice-api-key"}) as client:
+        response = client.post("/v1/usage", json={"carrier": "bait", "username": "5512345678"})
+    assert response.status_code == (504 if failure == "timeout" else 502)
+    assert response.headers["cache-control"] == "no-store"
+    for secret in ("private-details", "5512345678", "private-service-key"):
+        assert secret not in response.text
+    assert bait.http.is_closed

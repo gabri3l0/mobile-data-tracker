@@ -1,6 +1,5 @@
 from dataclasses import replace
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import httpx
@@ -9,26 +8,6 @@ import pytest
 from src.exceptions import CarrierError, CarrierTimeoutError
 from src.providers.bait import provider as provider_module
 from src.providers.bait.config import BaitConfig
-from src.providers.bait.provider import BaitProvider
-
-
-@pytest.fixture
-def bait(monkeypatch, bait_response):
-    state = SimpleNamespace(requests=[], payload=bait_response, status=200, content=None)
-
-    def respond(request):
-        state.requests.append(request)
-        if state.content is not None:
-            return httpx.Response(state.status, content=state.content)
-        return httpx.Response(state.status, json=state.payload)
-
-    config = BaitConfig(phone="5512345678", service_key="private-service-key",
-                        base_url="https://bait.example/api/core/q/dn")
-    with httpx.Client(transport=httpx.MockTransport(respond), timeout=30.0) as http:
-        monkeypatch.setattr(provider_module.httpx, "Client", lambda **kwargs: http)
-        state.provider = BaitProvider(config)
-        state.http = http
-        yield state
 
 
 def test_get_consumption_request_and_normalized_result(bait, monkeypatch, caplog):

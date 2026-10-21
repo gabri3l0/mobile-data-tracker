@@ -22,7 +22,10 @@ def get_usage(
         tracker = MobileDataTracker(
             carrier=credentials.carrier,
             username=credentials.username,
-            password=credentials.password.get_secret_value(),
+            password=(
+                credentials.password.get_secret_value()
+                if credentials.carrier == "telcel" and credentials.password is not None else None
+            ),
         )
         try:
             return UsageResponse(**tracker.get_usage_data())

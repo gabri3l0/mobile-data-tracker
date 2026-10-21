@@ -9,7 +9,7 @@ Track mobile data usage with two components:
   longer-term purpose of tracking family accounts, daily consumption, history, and
   trends. Those account-management and analytics features are not implemented yet.
 
-The current integration supports one carrier API format.
+The central server supports Telcel and Bait.
 
 ## Preview
 

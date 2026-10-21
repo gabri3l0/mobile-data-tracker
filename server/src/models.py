@@ -1,7 +1,7 @@
 from typing import Literal, NotRequired, TypedDict
 
 
-CarrierName = Literal["telcel"]
+CarrierName = Literal["telcel", "bait"]
 DataTier = Literal["high_speed", "throttled"]
 
 

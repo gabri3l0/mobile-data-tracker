@@ -3,7 +3,7 @@
 Python CLI and FastAPI service for reading mobile data usage. Its goal is to track
 family accounts and provide daily consumption, history, and trends.
 
-Currently supports Telcel and one account per request. Saved accounts,
+Supports Telcel and Bait, with one account per request. Saved accounts,
 scheduled collection, and analytics are planned.
 
 ## Folder structure
@@ -13,7 +13,7 @@ server/
 ├── src/
 │   ├── api/         App, routes, schemas, authentication, limits, and errors
 │   ├── providers/
-│   │   ├── bait/       Bait provider and parser (integration pending)
+│   │   ├── bait/       Bait provider, parser, and configuration
 │   │   └── telcel/     Telcel provider, parser, and configuration
 │   ├── client.py    Carrier selection and shared usage client
 │   ├── models.py    Carrier names and normalized usage type
@@ -32,6 +32,7 @@ server/
 - Plan name, expiration, days remaining, and reading timestamp.
 - Total, used, and remaining data in GB, with percentages.
 - CLI and HTTP API backed by the same carrier client.
+- Bait high-speed balances with automatic fallback to throttled data.
 - API keys and usage limits per person.
 - Sanitized API errors; credentials, tokens, and readings are not saved.
 - SSO logout attempted after each Telcel reading, including failed requests.
@@ -75,19 +76,25 @@ Set `TELCEL_USERNAME`, `TELCEL_PASSWORD`, and `TELCEL_BASIC_AUTH` in your local
 `.env`; see the [template](.env.example). Use the encoded Basic credential
 without the `Basic` prefix. Telcel URLs and scope are defined in
 `src/providers/telcel/config.py`.
+
+For Bait, set `BAIT_SERVICE_KEY` and, for CLI use, `BAIT_PHONE`. The API takes the
+phone number from each request's `username`. Bait URLs are defined in
+`src/providers/bait/config.py`.
+
 Run the commands below from `server/`.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `uv run python main.py --carrier telcel` | Print usage for the carrier account in `.env`. |
+| `uv run python main.py --carrier telcel` | Print usage for the Telcel account in `.env`. |
+| `uv run python main.py --carrier bait` | Print usage for `BAIT_PHONE` using `BAIT_SERVICE_KEY`. |
 | `uv run python scripts/create_token.py` | Generate an API key. |
 | `uv run uvicorn src.api.app:app --reload` | Start the API locally. |
 | `uv run pytest -v` | Run tests without real credentials or carrier requests. |
 
-The CLI defaults to Telcel when `--carrier` is omitted. It reads `TELCEL_*`
-settings from `.env` and needs no API key. API rate limits apply only
+The CLI defaults to Telcel when `--carrier` is omitted. It reads the selected
+carrier's settings from `.env` and needs no server API key. API rate limits apply only
 to HTTP requests. Set `LOG_LEVEL=DEBUG` for detailed CLI logs.
 
 ## Endpoints
@@ -102,8 +109,8 @@ Local base URL: `http://127.0.0.1:8000`.
 | GET | `/redoc` | No | Alternative API documentation. |
 | GET | `/openapi.json` | No | OpenAPI schema. |
 
-Send this JSON body to `POST /v1/usage`. The `carrier` field is required;
-only `telcel` is currently supported:
+Send a JSON body to `POST /v1/usage`. Both carriers require `username` as the phone
+number. Telcel also requires a password:
 
 ```json
 {
@@ -113,7 +120,19 @@ only `telcel` is currently supported:
 }
 ```
 
-The response includes plan details, dates, data balances, and percentages.
+Bait uses the server's service key and does not require a password:
+
+```json
+{
+  "carrier": "bait",
+  "username": "<phone-number>"
+}
+```
+
+The response includes plan details, dates, data balances, percentages, and
+`data_tier` (`high_speed` or `throttled` for Bait, `null` for Telcel).
+`last_updated` is Telcel's carrier reading time, or Bait's request completion time
+in UTC because Bait does not supply a reading timestamp.
 Open `/docs` for the full schema and request examples. Click **Authorize** and
 enter your key without the `Bearer` prefix to try a request.
 
@@ -125,7 +144,8 @@ parsing failure, `504` carrier timeout, and `500` unexpected failure.
 Import `http://127.0.0.1:8000/openapi.json`, then import
 [bruno/local.env.example.json](bruno/local.env.example.json) as an environment.
 Fill in `username`, `password`, and `api_key` locally and mark them as secret.
-The `carrier` variable defaults to `telcel`; Bait API selection is enabled in Step 2.
+Set `carrier` to `telcel` or `bait` and `username` to the phone number.
+The environment defaults to `telcel`.
 Use `{{base_url}}/v1/usage` with bearer token `{{api_key}}` and this body:
 
 ```json
@@ -136,19 +156,19 @@ Use `{{base_url}}/v1/usage` with bearer token `{{api_key}}` and this body:
 }
 ```
 
-Keep the template blank. Reimport the schema after API changes.
+For Bait, set `carrier` to `bait`; omit `password` or leave it blank.
+The service key stays in the server environment. Keep credentials blank in the
+committed template. Reimport the schema after API changes.
 
 ## Adding a carrier
 
 Add its `provider.py`, `parser.py`, and `config.py` under `src/providers/<name>/`.
 The provider implements `get_usage_data()` and `close()`, owns its authentication
-flow, and returns the shared `UsageData` fields. Add carrier selection in the shared client and
-`CarrierName`, and add tests. Bait's provider and parser are implemented; client, API, and CLI integration is next.
+flow, and returns the shared `UsageData` fields. Add carrier selection in the
+shared client and `CarrierName`, and add tests.
 
-## Bait provider (Step 1)
+## Bait balances
 
-The standalone provider reads `BAIT_PHONE` and `BAIT_SERVICE_KEY` from `.env`.
-It shows high-speed data while available, then throttled data, labeled with
+Bait shows high-speed data while available, then throttled data, labeled with
 `data_tier`. It converts MB to GB using 1024 and uses fetch time in UTC as
-`last_updated`. Minutes and messages are excluded. API and CLI selection still
-supports Telcel only until Step 2.
+`last_updated`. Minutes and messages are excluded.

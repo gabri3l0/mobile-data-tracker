@@ -55,9 +55,9 @@ def test_cli_selects_telcel_by_default_and_explicitly(cli):
     main.MobileDataTracker.assert_called_with(carrier="telcel")
 
 
-def test_cli_rejects_unimplemented_carrier_before_network_calls(cli):
+def test_cli_rejects_unknown_carrier_before_network_calls(cli):
     with pytest.raises(SystemExit) as error:
-        main.main(["--carrier", "bait"])
+        main.main(["--carrier", "unknown"])
     assert error.value.code == 2
     main.MobileDataTracker.assert_not_called()
 
@@ -68,3 +68,23 @@ def test_cli_initialization_failure_is_sanitized(cli, caplog):
         main.main([])
     assert error.value.code == 1
     assert "private-configuration" not in caplog.text
+
+
+def test_cli_selects_bait(cli):
+    main.main(["--carrier", "bait"])
+    main.MobileDataTracker.assert_called_once_with(carrier="bait")
+
+
+def test_bait_cli_fetches_and_prints_usage_with_mocked_http(bait, monkeypatch, capsys):
+    from src.providers.bait.config import BaitConfig
+
+    monkeypatch.setattr(main, "load_dotenv", Mock())
+    monkeypatch.setattr(BaitConfig, "from_env", lambda: bait.provider.config)
+    main.main(["--carrier", "bait"])
+    output = capsys.readouterr().out
+    assert "'data_tier': 'high_speed'" in output
+    assert "'remaining_gb': 13.4814453125" in output
+    assert "private-service-key" not in output
+    assert "5512345678" not in output
+    assert len(bait.requests) == 1
+    assert bait.http.is_closed
