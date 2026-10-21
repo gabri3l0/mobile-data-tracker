@@ -9,12 +9,10 @@ or computer needed. Android is not supported yet.
 
 | Carrier | Design | Preview | Script | Customize |
 | --- | --- | --- | --- | --- |
-| Telcel | Solid color | &lt;image&gt; | [solid.js](telcel/solid.js) | [Settings](#customize) |
-| Telcel | Background image | &lt;image&gt; | [image.js](telcel/image.js) | [Settings](#customize) |
-| Bait | Solid color | &lt;image&gt; | [solid.js](bait/solid.js) | [Settings](#customize) |
-| Bait | Background image | &lt;image&gt; | [image.js](bait/image.js) | [Settings](#customize) |
-
-<!-- Replace the <image> placeholders with screenshots for each widget. -->
+| Telcel | Solid color | [<img src="screenshots/telcel_solid.png" alt="Telcel · solid color" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=telcel) | [solid.js](telcel/solid.js) | [Settings](#customize) |
+| Telcel | Background image | [<img src="screenshots/telcel_image.png" alt="Telcel · background image" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=telcel) | [image.js](telcel/image.js) | [Settings](#customize) |
+| Bait | Solid color | [<img src="screenshots/bait_solid.png" alt="Bait · solid color" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=bait) | [solid.js](bait/solid.js) | [Settings](#customize) |
+| Bait | Background image | [<img src="screenshots/bait_image.png" alt="Bait · background image" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=bait) | [image.js](bait/image.js) | [Settings](#customize) |
 
 ## Install on iPhone
 

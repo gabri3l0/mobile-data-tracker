@@ -17,10 +17,10 @@ y cómo revisar los logs. No necesitas servidor ni computadora.
 Elige Telcel o Bait en cualquiera de las vistas previas para probar colores,
 fondos y estados con datos de ejemplo.
 
-| Color sólido | Imagen 1 | Imagen 2 |
-| :---: | :---: | :---: |
-| [<img src="widgets/screenshots/dark.jpg" alt="Widget con color sólido" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Widget con imagen 1" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Widget con imagen 2" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
-| [Abrir vista de color sólido](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [Abrir vista de imagen 1](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [Abrir vista de imagen 2](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
+| Operador | Color sólido | Imagen de fondo | Obtener código |
+| --- | :---: | :---: | --- |
+| Telcel | [<img src="widgets/screenshots/telcel_solid.png" alt="Telcel · color sólido" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=telcel) | [<img src="widgets/screenshots/telcel_image.png" alt="Telcel · imagen de fondo" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=telcel) | [Widgets de Telcel](widgets/telcel/) |
+| Bait | [<img src="widgets/screenshots/bait_solid.png" alt="Bait · color sólido" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=bait) | [<img src="widgets/screenshots/bait_image.png" alt="Bait · imagen de fondo" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=bait) | [Widgets de Bait](widgets/bait/) |
 
 ## Funciones de los widgets
 

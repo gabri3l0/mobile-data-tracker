@@ -17,10 +17,10 @@ No server or computer is needed.
 
 Choose Telcel or Bait in either preview to try colors, backgrounds, and sample states.
 
-| Solid | Image 1 | Image 2 |
-| :---: | :---: | :---: |
-| [<img src="widgets/screenshots/dark.jpg" alt="Solid widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Image 1 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Image 2 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
-| [Open Solid preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [Open Image 1 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [Open Image 2 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
+| Carrier | Solid color | Background image | Get code |
+| --- | :---: | :---: | --- |
+| Telcel | [<img src="widgets/screenshots/telcel_solid.png" alt="Telcel · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=telcel) | [<img src="widgets/screenshots/telcel_image.png" alt="Telcel · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=telcel) | [Telcel widgets](widgets/telcel/) |
+| Bait | [<img src="widgets/screenshots/bait_solid.png" alt="Bait · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=bait) | [<img src="widgets/screenshots/bait_image.png" alt="Bait · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=bait) | [Bait widgets](widgets/bait/) |
 
 ## Widget features
 
