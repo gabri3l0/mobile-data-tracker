@@ -13,7 +13,6 @@ server/
 ├── src/
 │   ├── api/         App, routes, schemas, authentication, limits, and errors
 │   ├── providers/
-│   │   ├── base.py     Common provider interface
 │   │   └── telcel/     Telcel provider, parser, and configuration
 │   ├── client.py    Carrier selection and shared usage client
 │   ├── models.py    Carrier names and normalized usage type
@@ -69,7 +68,10 @@ uv sync
 cp .env.example .env
 ```
 
-Configure Telcel with the `TELCEL_*` variables in [.env.example](.env.example).
+Set `TELCEL_USERNAME`, `TELCEL_PASSWORD`, and `TELCEL_BASIC_AUTH` in your local
+`.env`; see the [template](.env.example). Use the encoded Basic credential
+without the `Basic` prefix. Telcel URLs and scope are defined in
+`src/providers/telcel/config.py`.
 Run the commands below from `server/`.
 
 ## Commands

@@ -2,7 +2,6 @@ import logging
 from dataclasses import replace
 
 from src.models import CarrierName, UsageData
-from src.providers.base import UsageProvider
 from src.providers.telcel.config import TelcelConfig
 from src.providers.telcel.provider import TelcelProvider
 
@@ -22,7 +21,7 @@ class MobileDataTracker:
             username=config.username if username is None else username,
             password=config.password if password is None else password,
         )
-        self._provider: UsageProvider = TelcelProvider(config)
+        self._provider = TelcelProvider(config)
 
     def get_usage_data(self) -> UsageData:
         logger.info("Retrieving usage data.")

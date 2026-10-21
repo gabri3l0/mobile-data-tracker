@@ -31,15 +31,25 @@ def test_client_propagates_provider_failure(monkeypatch):
     provider.close.assert_called_once_with()
 
 
-def test_telcel_configuration_reads_only_telcel_variables(monkeypatch):
+def test_telcel_configuration_loads_credentials_and_keeps_builtin_endpoints(monkeypatch):
     monkeypatch.setenv("TELCEL_USERNAME", "telcel-user")
     monkeypatch.setenv("TELCEL_PASSWORD", "telcel-password")
-    monkeypatch.setenv("TELCEL_HOME_URL", "https://telcel.example/home")
+    monkeypatch.setenv("TELCEL_BASIC_AUTH", "test-basic")
+    monkeypatch.setenv("TELCEL_SITE_DOMAIN", "stale-value")
+    monkeypatch.setenv("TELCEL_SCOPE", "stale-value")
+    monkeypatch.setenv("TELCEL_LOGIN_URL", "stale-value")
+    monkeypatch.setenv("TELCEL_TOKEN_URL", "stale-value")
+    monkeypatch.setenv("TELCEL_HOME_URL", "stale-value")
     monkeypatch.setenv("CARRIER_USERNAME", "another-user")
     config = TelcelConfig.from_env()
     assert config.username == "telcel-user"
     assert config.password == "telcel-password"
-    assert config.home_url == "https://telcel.example/home"
+    assert config.basic_auth == "test-basic"
+    assert config.site_domain == "https://www.mitelcel.com"
+    assert config.scope == "token:mit|token:b2f"
+    assert config.login_url == "https://wbl.telcel-id.com:8443/login"
+    assert config.token_url == "https://mi-telcel.smapps.mx/security/1.0.0/v2/token"
+    assert config.home_url == "https://api.journeys.telcel.wavebybemobi.com/api/components/flow/home"
     assert "telcel-password" not in repr(config)
 
 
@@ -48,7 +58,6 @@ def test_client_creates_isolated_accounts_and_preserves_telcel_settings(monkeypa
     monkeypatch.setattr(client, "TelcelProvider", constructor)
     monkeypatch.setenv("TELCEL_USERNAME", "environment-user")
     monkeypatch.setenv("TELCEL_PASSWORD", "environment-password")
-    monkeypatch.setenv("TELCEL_SCOPE", "test-scope")
     MobileDataTracker("telcel")
     MobileDataTracker("telcel", username="alice", password="alice-secret")
     MobileDataTracker("telcel", username="bob", password="bob-secret")
@@ -57,7 +66,7 @@ def test_client_creates_isolated_accounts_and_preserves_telcel_settings(monkeypa
         ("environment-user", "environment-password"),
         ("alice", "alice-secret"), ("bob", "bob-secret"),
     ]
-    assert all(c.scope == "test-scope" for c in configs)
+    assert all(c.scope == "token:mit|token:b2f" for c in configs)
     assert len({id(c) for c in configs}) == 3
 
 

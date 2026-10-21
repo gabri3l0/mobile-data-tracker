@@ -61,8 +61,8 @@ class TelcelProvider:
         self._require(
             TELCEL_USERNAME=config.username,
             TELCEL_PASSWORD=config.password,
-            TELCEL_SITE_DOMAIN=config.site_domain,
-            TELCEL_LOGIN_URL=config.login_url,
+            site_domain=config.site_domain,
+            login_url=config.login_url,
         )
         response = self._request("POST", config.login_url, follow_redirects=True, data={
             "username": config.username,
@@ -88,8 +88,8 @@ class TelcelProvider:
         self._require(
             TELCEL_USERNAME=config.username,
             TELCEL_BASIC_AUTH=config.basic_auth,
-            TELCEL_SCOPE=config.scope,
-            TELCEL_TOKEN_URL=config.token_url,
+            scope=config.scope,
+            token_url=config.token_url,
             login_token=login_token,
         )
         response = self._request(
@@ -130,7 +130,7 @@ class TelcelProvider:
         config = self.config
         self._require(
             TELCEL_USERNAME=config.username,
-            TELCEL_HOME_URL=config.home_url,
+            home_url=config.home_url,
             bearer_token=access_token,
         )
         response = self._request(
