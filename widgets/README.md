@@ -72,3 +72,15 @@ Copy the generated values into `SETTINGS`; previews do not edit your JS file.
 To try sample data inside Scriptable, set `useSampleData: true`. Choose
 `sampleState`: `success`, `stale`, `error`, or `setup`; Bait also supports
 `throttled` for reduced-speed data. Set `useSampleData` back to `false` for live usage.
+
+## Folder structure
+
+```text
+widgets/
+├── telcel/       Standalone Telcel scripts: solid.js and image.js
+├── bait/         Standalone Bait scripts: solid.js and image.js
+├── previews/     HTML previews using sample data
+├── screenshots/  Widget images for documentation
+├── tests/        Mocked Scriptable tests and response fixtures
+└── README.md     Setup, refresh behavior, debugging, and customization
+```
