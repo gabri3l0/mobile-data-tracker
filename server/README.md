@@ -1,3 +1,6 @@
+> [!NOTE]
+> Para ver la versión en español, [haz clic aquí](README.es.md).
+
 # Central server
 
 Python CLI and FastAPI service for reading mobile data usage from **Telcel and Bait**.

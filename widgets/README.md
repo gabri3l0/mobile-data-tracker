@@ -1,3 +1,6 @@
+> [!NOTE]
+> Para ver la versión en español, [haz clic aquí](README.es.md).
+
 # Mobile Data Widgets
 
 Check your remaining mobile data and plan expiration from your home screen.
@@ -82,5 +85,6 @@ widgets/
 ├── previews/     HTML previews using sample data
 ├── screenshots/  Widget images for documentation
 ├── tests/        Mocked Scriptable tests and response fixtures
-└── README.md     Setup, refresh behavior, debugging, and customization
+├── README.md     English guide
+└── README.es.md  Spanish guide
 ```

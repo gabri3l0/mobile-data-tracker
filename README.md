@@ -1,3 +1,6 @@
+> [!NOTE]
+> Para ver la versión en español, [haz clic aquí](README.es.md).
+
 # Mobile Data Tracker
 
 Check your Telcel or Bait mobile data usage from your home screen. Choose a
