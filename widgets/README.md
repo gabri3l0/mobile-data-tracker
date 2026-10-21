@@ -1,7 +1,8 @@
 # Mobile data widgets
 
 Show your remaining mobile data on your iPhone with Scriptable.
-The new [standalone Telcel widgets](telcel/README.md) call the carrier directly.
+The new standalone [Telcel](telcel/README.md) and [Bait](bait/README.md) widgets
+call each carrier directly.
 Copy one script into Scriptable; no server or helper script is needed.
 
 The instructions below describe the existing `dark/` and `image/` versions, which
@@ -11,6 +12,7 @@ the transition to carrier folders.
 ## Contents
 
 - [Standalone Telcel](telcel/README.md): self-contained solid and image designs.
+- [Standalone Bait](bait/README.md): phone-only setup, high-speed and throttled data.
 
 - [Dark](dark/README.md): compact widget with a dark background.
 - [Image](image/README.md): widget with a configurable image background.

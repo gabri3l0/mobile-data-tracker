@@ -5,6 +5,9 @@ const vm = require('node:vm');
 const KEY = 'mobile-data-tracker.telcel.credentials.v1';
 const CACHE = '/library/mobile-data-tracker-telcel-usage-v1.json';
 const CREDENTIALS = { phone: '5512345678', password: 'private password+ñ', profileId: 'test-profile' };
+const BAIT_KEY = 'mobile-data-tracker.bait.credentials.v1';
+const BAIT_CACHE = '/library/mobile-data-tracker-bait-usage-v1.json';
+const BAIT_CREDENTIALS = { phone: '5598765432', profileId: 'bait-profile' };
 const NOW = Date.UTC(2026, 9, 20, 21, 38);
 
 function homeResponse() {
@@ -32,7 +35,9 @@ function fullFlow(home = homeResponse()) {
 }
 
 async function loadWidget(design, options = {}) {
-  const filename = path.join(__dirname, '..', 'telcel', `${design}.js`);
+  const carrier = options.carrier || 'telcel';
+  const profileKey = carrier === 'bait' ? BAIT_KEY : KEY;
+  const filename = path.join(__dirname, '..', carrier, `${design}.js`);
   let source = fs.readFileSync(filename, 'utf8');
   // Keep bundled website configuration out of test snapshots and failure output.
   source = source.replace(/const CLIENT_AUTH = "[^"]+";/, `const CLIENT_AUTH = "${Buffer.from('test-client-auth').toString('base64')}";`);
@@ -44,7 +49,7 @@ async function loadWidget(design, options = {}) {
     writeError: false, removeError: false, keyWriteError: false,
     ...options,
   };
-  if (options.credentials) state.keys.set(KEY, JSON.stringify(options.credentials));
+  if (options.credentials) state.keys.set(profileKey, JSON.stringify(options.credentials));
   class Clock extends Date {
     constructor(...args) { super(...(args.length ? args : [state.now])); }
     static now() { return state.now; }
@@ -161,9 +166,9 @@ async function loadWidget(design, options = {}) {
     credentialsForRun, parseUsage, isUsageData, loadUsage, fetchUsage, readCache, writeCache,
     retryDeadline, createWidget, main,
     loadBackgroundImage: typeof loadBackgroundImage === 'function' ? loadBackgroundImage : null,
-  };\n})()`, { filename: `telcel-${design}.js` }).runInContext(context);
+  };\n})()`, { filename: `${carrier}-${design}.js` }).runInContext(context);
   if (options.settings) Object.assign(hooks.SETTINGS, options.settings);
   return { hooks, state };
 }
 
-module.exports = { loadWidget, homeResponse, fullFlow, CREDENTIALS, KEY, CACHE, NOW };
+module.exports = { loadWidget, homeResponse, fullFlow, CREDENTIALS, KEY, CACHE, NOW, BAIT_KEY, BAIT_CACHE, BAIT_CREDENTIALS };
