@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Color sólido · Vista previa</title>
+  <title>Crea tu widget · Mobile Data Tracker</title>
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #242428; background: #f6f4f2; }
     * { box-sizing: border-box; }
@@ -56,31 +56,38 @@
     .validation { color: #a52c23; }
     [aria-invalid="true"] { border-color: #a52c23 !important; }
     .zoom { max-width: 220px; margin: 18px 0 0 auto; }
-    .settings { margin-top: 24px; }
     textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.6; }
-    nav { display: flex; gap: 18px; margin-bottom: 24px; font-size: 13px; }
     a { color: #6c4642; text-underline-offset: 3px; }
     .available { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card { position: relative; isolation: isolate; overflow: hidden; }
     .background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: -2; }
     .has-background::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--overlay-opacity, .65)); z-index: -1; pointer-events: none; }
     .image-design .badge, .image-design .unit, .image-design .available, .image-design .percentage, .image-design .footer, .image-design .execution, .image-design .empty span { color: #fff; }
+  
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .actions button { background: #242428; color: white; }
+    .actions button:disabled { opacity: .45; cursor: default; }
+    .code-section { margin-top: 28px; }
+    .code-section h2 { font-size: 22px; letter-spacing: -.02em; }
+    .code-section textarea { margin-top: 10px; font-size: 11px; }
+    details { margin-top: 20px; font-size: 12px; color: #747177; }
+    details label { margin-top: 12px; max-width: 280px; }
+    summary { cursor: pointer; }
   </style>
 </head>
-<body data-design="solid" class="solid-design">
+<body>
   <main>
-    <nav aria-label="Diseños"><a href="solid.html">Color sólido</a><a href="image.html">Imagen de fondo</a></nav>
-    <div class="eyebrow">Widgets / Vista previa</div>
-    <h1>Color sólido</h1>
-    <p class="intro">Widget pequeño · Datos de ejemplo · Sin consultas a tu cuenta</p>
+    <div class="eyebrow">Mobile Data Tracker</div>
+    <h1>Crea tu widget</h1>
+    <p class="intro">Elige tu operador y fondo, genera el código y pégalo en Scriptable.<br>La vista usa datos de ejemplo. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain.</p>
     <div class="controls">
       <label>Operador<select id="carrier"><option value="telcel">Telcel</option><option value="bait">Bait</option></select></label>
-      <label>Estado<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+      <label>Diseño<select id="design"><option value="solid">Color sólido</option><option value="image">Imagen de fondo</option></select></label>
       <label>Color de fondo<span class="color-control"><input id="color-picker" type="color" value="#101012" aria-label="Selector de color"><input id="hex" type="text" value="101012" maxlength="7" spellcheck="false" aria-label="Color hexadecimal" aria-describedby="color-error"></span></label>
     </div>
     <p class="status validation" id="color-error" role="status" hidden>Usa seis dígitos hexadecimales, por ejemplo 101012.</p>
     <section class="image-options" id="image-settings" aria-label="Fondo de imagen" hidden>
-      <div class="image-controls"><label>URL de la imagen<input id="image-url" type="url" value="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdZaVghFotA_TTTq7zfOxO5AipAmIdJpEJaQ0j4WnVb0BQfW67EaoZPcXC&amp;s=10" placeholder="https://..." aria-describedby="image-status"></label><button id="apply-image" type="button">Aplicar imagen</button></div>
+      <div class="image-controls"><label>URL de la imagen<input id="image-url" type="url" value="" placeholder="https://..." aria-describedby="image-status"></label><button id="apply-image" type="button">Aplicar imagen</button></div>
       <p class="status" id="image-status" role="status"></p>
       <label>Oscurecimiento <output id="opacity-value" for="opacity">0.65</output><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.65"></label>
     </section>
@@ -102,11 +109,21 @@
       </div>
     </div>
     <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
-    <label class="settings">Copia estos valores en SETTINGS de tu script<textarea id="settings" rows="2" readonly spellcheck="false"></textarea></label>
-    <p class="note">Los controles no modifican tus archivos JavaScript. La vista aproxima el diseño de iOS; confirma el resultado en Scriptable.</p>
+    <details>
+      <summary>Probar otros estados de la vista previa</summary>
+      <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+    </details>
+    <section class="code-section" aria-labelledby="code-title">
+      <h2 id="code-title">Llévalo a Scriptable</h2>
+      <p class="intro">Genera tu script completo. Cópialo en un nuevo script de Scriptable y ejecútalo con ▶ para guardar tu cuenta. Después, agrega un widget pequeño de Scriptable a tu pantalla de inicio y selecciona ese script.</p>
+      <div class="actions"><button id="generate-code" type="button">Generar código</button><button id="copy-code" type="button" disabled>Copiar código</button><button id="download-code" type="button" disabled>Descargar .js</button></div>
+      <p class="status" id="code-status" role="status" aria-live="polite"></p>
+      <label id="code-output" hidden>Código completo<textarea id="code" rows="12" readonly spellcheck="false"></textarea></label>
+      <p class="note">¿Necesitas ayuda? <a href="https://github.com/gabri3l0/mobile-data-tracker/blob/main/widgets/README.es.md">Ver la guía</a> · <a href="https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/">Abrir generador en línea</a></p>
+    </section>
+    <p class="note">El código generado consulta tu consumo real; los estados de ejemplo solo afectan esta vista. El diseño aproxima el de iOS: confirma el resultado en Scriptable.</p>
   </main>
   <script>
-const IMAGE_DESIGN = document.body.dataset.design === "image";
 const $ = id => document.getElementById(id);
 const RUN_AT = new Date();
 const SAMPLES = {
@@ -122,62 +139,79 @@ const SAMPLES = {
     used_percentage: 32.64, remaining_percentage: 67.36, data_tier: "high_speed",
   },
 };
-let backgroundReady = false;
-let appliedImageUrl = "";
+const sources = new Map();
 let appliedHex = "101012";
+let appliedImageUrl = "";
+let backgroundReady = false;
+let revision = 0;
+let busy = false;
+let generated = null;
 
+function imageDesign() { return $("design").value === "image"; }
+function validHex() { return /^#?[0-9a-f]{6}$/i.test($("hex").value.trim()); }
+function validImage() {
+  const value = $("image-url").value.trim();
+  if (!value) return true;
+  try { return ["http:", "https:"].includes(new URL(value).protocol); }
+  catch { return false; }
+}
+function validAppearance() { return validHex() && (!imageDesign() || validImage()); }
+function invalidateCode() {
+  revision++;
+  generated = null;
+  $("code").value = "";
+  $("code-output").hidden = true;
+  $("copy-code").disabled = true;
+  $("download-code").disabled = true;
+  $("generate-code").disabled = busy || !validAppearance();
+  $("code-status").textContent = busy ? "Cargando el script…" : "Elige tu diseño y genera el código.";
+}
 function formatRunTime(value) {
   const pad = number => String(number).padStart(2, "0");
   return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${String(value.getFullYear()).slice(-2)} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
-
-function updateSettings() {
-  let value = `backgroundHex: "${appliedHex}",`;
-  if (IMAGE_DESIGN) value += `\nbackgroundImageUrl: ${JSON.stringify(appliedImageUrl)},\nbackgroundOverlayOpacity: ${Number($("opacity").value)},`;
-  $("settings").value = value;
-}
-
 function applyHex(value) {
-  const hex = value.trim().replace(/^#/, "");
-  const valid = /^[0-9a-f]{6}$/i.test(hex);
+  const valid = /^#?[0-9a-f]{6}$/i.test(value.trim());
   $("hex").setAttribute("aria-invalid", String(!valid));
   $("color-error").hidden = valid;
-  if (!valid) return;
-  appliedHex = hex.toUpperCase();
-  $("hex").value = appliedHex;
-  $("color-picker").value = `#${appliedHex}`;
-  $("card").style.backgroundColor = `#${appliedHex}`;
-  updateSettings();
+  if (valid) {
+    appliedHex = value.trim().replace(/^#/, "").toUpperCase();
+    $("hex").value = appliedHex;
+    $("color-picker").value = `#${appliedHex}`;
+    $("card").style.backgroundColor = `#${appliedHex}`;
+  }
+  invalidateCode();
 }
-
 function updateBackgroundVisibility() {
-  const show = IMAGE_DESIGN && backgroundReady && !["error", "setup"].includes($("state").value);
+  const show = imageDesign() && backgroundReady && !["error", "setup"].includes($("state").value);
   $("background").hidden = !show;
   $("card").classList.toggle("has-background", show);
 }
-
+function clearBackground() {
+  backgroundReady = false;
+  $("background").onload = null;
+  $("background").onerror = null;
+  $("background").removeAttribute("src");
+  updateBackgroundVisibility();
+}
 function applyImage() {
-  const value = $("image-url").value.trim();
-  if (value) {
-    try {
-      const url = new URL(value);
-      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
-    } catch {
-      $("image-status").textContent = "Usa una URL que empiece con https:// o http://.";
-      $("image-url").setAttribute("aria-invalid", "true");
-      return;
-    }
+  if (!imageDesign()) { clearBackground(); return; }
+  if (!validImage()) {
+    $("image-status").textContent = "Usa una URL que empiece con https:// o http://.";
+    $("image-url").setAttribute("aria-invalid", "true");
+    return;
   }
   $("image-url").setAttribute("aria-invalid", "false");
+  const value = $("image-url").value.trim();
+  if (value !== appliedImageUrl) clearBackground();
   appliedImageUrl = value;
-  backgroundReady = false;
-  updateBackgroundVisibility();
-  updateSettings();
   if (!value) {
-    $("background").removeAttribute("src");
+    clearBackground();
     $("image-status").textContent = "Sin imagen: se usa el color sólido.";
     return;
   }
+  if (["error", "setup"].includes($("state").value)) { updateBackgroundVisibility(); return; }
+  if ($("background").getAttribute("src") === value) { updateBackgroundVisibility(); return; }
   $("image-status").textContent = "Cargando imagen…";
   $("background").onload = () => {
     backgroundReady = true;
@@ -186,12 +220,11 @@ function applyImage() {
   };
   $("background").onerror = () => {
     backgroundReady = false;
-    $("image-status").textContent = "No se pudo cargar la imagen; se usa el color sólido.";
+    $("image-status").textContent = "No se pudo cargar la imagen; se usará el color sólido si también falla en Scriptable.";
     updateBackgroundVisibility();
   };
   $("background").src = value;
 }
-
 function render() {
   const carrier = $("carrier").value;
   const isBait = carrier === "bait";
@@ -227,7 +260,13 @@ function render() {
   $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
   $("warning").hidden = state !== "stale";
 }
-
+function setDesign() {
+  document.body.classList.toggle("image-design", imageDesign());
+  $("image-settings").hidden = !imageDesign();
+  invalidateCode();
+  applyImage();
+  render();
+}
 function setZoom(value) {
   $("card").style.transform = `scale(${value})`;
   $("frame").style.width = `${170 * value}px`;
@@ -235,36 +274,124 @@ function setZoom(value) {
   $("scale").textContent = `${value}×`;
   $("zoom").value = String(value);
 }
-
-$("carrier").addEventListener("change", render);
-$("state").addEventListener("change", render);
+// Read the canonical script as text. Only replace values inside its SETTINGS block.
+function buildWidgetSource(source, appearance) {
+  const blocks = source.match(/^const SETTINGS = \{[\s\S]*?^\};/gm);
+  if (!blocks || blocks.length !== 1 || !/\nawait main\(\);\s*$/.test(source)) throw new Error("Invalid script");
+  let settings = blocks[0];
+  for (const [key, value] of Object.entries({ ...appearance, useSampleData: false, debug: false })) {
+    const pattern = new RegExp(String.raw`^(  ${key}: )(?:"(?:\\.|[^"\\])*"|true|false|\d+(?:\.\d+)?)(,.*)$`, "gm");
+    const matches = settings.match(pattern);
+    if (!matches || matches.length !== 1) throw new Error("Missing setting");
+    settings = settings.replace(pattern, (_, prefix, suffix) => `${prefix}${JSON.stringify(value)}${suffix}`);
+  }
+  return source.replace(blocks[0], () => settings);
+}
+async function generateCode() {
+  if (busy || !validAppearance()) return;
+  invalidateCode();
+  if (window.location.protocol === "file:") {
+    $("code-status").textContent = "Para generar el código, abre el generador en línea desde el enlace de abajo, o sirve el repositorio con un servidor HTTP local.";
+    return;
+  }
+  const carrier = $("carrier").value;
+  const design = $("design").value;
+  const key = `${carrier}/${design}`;
+  const appearance = { backgroundHex: appliedHex };
+  if (imageDesign()) {
+    applyImage();
+    appearance.backgroundImageUrl = $("image-url").value.trim();
+    appearance.backgroundOverlayOpacity = Number($("opacity").value);
+  }
+  const currentRevision = revision;
+  busy = true;
+  $("generate-code").disabled = true;
+  $("code-status").textContent = "Cargando el script…";
+  try {
+    let source = sources.get(key);
+    if (!source) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(`../${key}.js`, { cache: "no-cache", credentials: "omit", signal: controller.signal });
+        if (!response.ok) throw new Error("Script unavailable");
+        source = await response.text();
+      } finally { clearTimeout(timeout); }
+    }
+    const code = buildWidgetSource(source, appearance);
+    sources.set(key, source);
+    if (currentRevision !== revision) return;
+    generated = { code, filename: `${carrier}-${design}.js` };
+    $("code").value = code;
+    $("code-output").hidden = false;
+    $("copy-code").disabled = false;
+    $("download-code").disabled = false;
+    $("code-status").textContent = "Código listo. Cópialo completo en un nuevo script de Scriptable y ejecútalo para configurar tu cuenta.";
+  } catch {
+    if (currentRevision === revision) $("code-status").textContent = "No se pudo cargar el script. Revisa tu conexión e intenta generar de nuevo.";
+  } finally {
+    busy = false;
+    $("generate-code").disabled = !validAppearance();
+    if (currentRevision !== revision) $("code-status").textContent = "Cambiaste los ajustes. Genera el código de nuevo.";
+  }
+}
+async function copyCode() {
+  if (!generated) return;
+  const current = generated;
+  try {
+    await navigator.clipboard.writeText(current.code);
+    if (generated === current) $("code-status").textContent = "Código copiado. Pégalo en Scriptable.";
+  } catch {
+    if (generated !== current) return;
+    $("code").focus();
+    $("code").select();
+    $("code-status").textContent = "Copia automática no disponible. El código está seleccionado: cópialo manualmente.";
+  }
+}
+function downloadCode() {
+  if (!generated) return;
+  const url = URL.createObjectURL(new Blob([generated.code], { type: "text/javascript;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = generated.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$("carrier").addEventListener("change", () => { invalidateCode(); render(); });
+$("design").addEventListener("change", setDesign);
+$("state").addEventListener("change", () => { render(); applyImage(); });
 $("hex").addEventListener("input", event => applyHex(event.target.value));
 $("color-picker").addEventListener("input", event => applyHex(event.target.value));
 $("zoom").addEventListener("input", event => setZoom(Number(event.target.value)));
-$("image-settings").hidden = !IMAGE_DESIGN;
-if (IMAGE_DESIGN) {
-  $("apply-image").addEventListener("click", applyImage);
-  $("opacity").addEventListener("input", () => {
-    $("card").style.setProperty("--overlay-opacity", $("opacity").value);
-    $("opacity-value").textContent = $("opacity").value;
-    updateSettings();
-  });
-}
-const params = new URLSearchParams(window.location.search);
-if (["telcel", "bait"].includes(params.get("carrier"))) $("carrier").value = params.get("carrier");
-if (["success", "stale", "error", "setup", "throttled"].includes(params.get("state"))) $("state").value = params.get("state");
-applyHex(params.get("hex") || $("hex").value);
-if (IMAGE_DESIGN) {
-  if (params.has("image")) $("image-url").value = params.get("image");
-  const opacity = params.get("overlay");
-  if (opacity !== null && opacity.trim() && Number.isFinite(Number(opacity))) $("opacity").value = String(Math.max(0, Math.min(1, Number(opacity))));
+$("image-url").addEventListener("input", () => {
+  invalidateCode();
+  $("image-url").setAttribute("aria-invalid", String(!validImage()));
+  $("image-status").textContent = validImage() ? "Aplica la imagen para verla." : "Usa una URL que empiece con https:// o http://.";
+});
+$("image-url").addEventListener("change", applyImage);
+$("apply-image").addEventListener("click", () => { invalidateCode(); applyImage(); });
+$("opacity").addEventListener("input", () => {
   $("card").style.setProperty("--overlay-opacity", $("opacity").value);
   $("opacity-value").textContent = $("opacity").value;
-  applyImage();
-}
-updateSettings();
+  invalidateCode();
+});
+$("generate-code").addEventListener("click", generateCode);
+$("copy-code").addEventListener("click", copyCode);
+$("download-code").addEventListener("click", downloadCode);
+const params = new URLSearchParams(window.location.search);
+if (["telcel", "bait"].includes(params.get("carrier"))) $("carrier").value = params.get("carrier");
+if (["solid", "image"].includes(params.get("design"))) $("design").value = params.get("design");
+if (["success", "stale", "error", "setup", "throttled"].includes(params.get("state"))) $("state").value = params.get("state");
+if (params.has("image")) $("image-url").value = params.get("image");
+const opacity = params.get("overlay");
+if (opacity !== null && opacity.trim() && Number.isFinite(Number(opacity))) $("opacity").value = String(Math.max(0, Math.min(1, Number(opacity))));
+$("card").style.setProperty("--overlay-opacity", $("opacity").value);
+$("opacity-value").textContent = $("opacity").value;
+applyHex(params.get("hex") || $("hex").value);
 setZoom(window.innerWidth < 420 ? 1.5 : 2);
-render();
+setDesign();
   </script>
 </body>
 </html>

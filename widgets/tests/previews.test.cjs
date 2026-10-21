@@ -5,111 +5,229 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { loadWidget } = require('./scriptable-mock.cjs');
 
-function preview(design, search = '', width = 1000) {
-  const html = fs.readFileSync(path.join(__dirname, '../previews', `${design}.html`), 'utf8');
+function sourceFor(carrier, design) {
+  return fs.readFileSync(path.join(__dirname, '..', carrier, `${design}.js`), 'utf8')
+    .replace(/const CLIENT_AUTH = "[^"]+";/, 'const CLIENT_AUTH = "test-client-auth";');
+}
+function classes() {
+  const values = new Set();
+  return { toggle(key, enabled) { enabled ? values.add(key) : values.delete(key); }, contains(key) { return values.has(key); } };
+}
+function preview(search = '', options = {}) {
+  const html = fs.readFileSync(path.join(__dirname, '../previews/index.html'), 'utf8');
   const elements = {};
+  const state = { requests: [], images: [], copied: [], downloads: [], blobs: [] };
   for (const match of html.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/gi)) {
     const tag = match[0];
     const listeners = {};
-    const classes = new Set();
-    elements[match[1]] = {
+    const element = {
       value: (tag.match(/\bvalue="([^"]*)"/)?.[1] || '').replaceAll('&amp;', '&'),
-      hidden: /\bhidden\b/.test(tag),
-      style: { setProperty(key, value) { this[key] = value; } },
-      classList: { toggle(key, enabled) { enabled ? classes.add(key) : classes.delete(key); }, contains(key) { return classes.has(key); } },
+      hidden: /\bhidden\b/.test(tag), disabled: /\bdisabled\b/.test(tag),
+      style: { setProperty(key, value) { this[key] = value; } }, classList: classes(),
       setAttribute(key, value) { this[key] = value; },
+      getAttribute(key) { return this[key] ?? null; },
       removeAttribute(key) { delete this[key]; },
       addEventListener(key, callback) { listeners[key] = callback; },
-      emit(key) { listeners[key]?.({ target: this }); },
+      emit(key) { return listeners[key]?.({ target: this }); },
+      focus() { this.focused = true; }, select() { this.selected = true; },
     };
+    elements[match[1]] = element;
   }
-  elements.carrier.value = 'telcel';
-  elements.state.value = 'success';
+  let imageSrc;
+  Object.defineProperty(elements.background, 'src', {
+    configurable: true, get: () => imageSrc,
+    set(value) { imageSrc = value; state.images.push(value); },
+  });
+  elements.background.removeAttribute = key => { if (key === 'src') imageSrc = undefined; };
+  elements.carrier.value = 'telcel'; elements.design.value = 'solid'; elements.state.value = 'success';
+  class BrowserURL extends URL {
+    static createObjectURL(blob) { state.blobs.push(blob); return 'blob:test'; }
+    static revokeObjectURL() {}
+  }
   const context = vm.createContext({
-    document: { body: { dataset: { design } }, getElementById: id => elements[id] },
-    window: { location: { search }, innerWidth: width }, URL, URLSearchParams,
+    document: {
+      body: { classList: classes(), appendChild() {} }, getElementById: id => elements[id],
+      createElement() { return { click() { state.downloads.push({ href: this.href, filename: this.download }); }, remove() {} }; },
+    },
+    window: { location: { search, protocol: options.protocol || 'http:' }, innerWidth: options.width || 1000 },
+    URL: BrowserURL, URLSearchParams, Blob, AbortController, setTimeout: () => 1, clearTimeout() {},
+    navigator: { clipboard: { async writeText(value) { if (options.copyError) throw new Error(); state.copied.push(value); } } },
+    async fetch(url, settings) {
+      state.requests.push({ url, settings });
+      if (options.fetch) return options.fetch(url, settings);
+      const [, carrier, design] = url.match(/^\.\.\/(telcel|bait)\/(solid|image)\.js$/) || [];
+      if (!carrier) throw new Error('Unexpected fetch');
+      return { ok: true, text: async () => sourceFor(carrier, design) };
+    },
   });
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
-  return { elements, evaluate: expression => vm.runInContext(expression, context) };
+  return { elements, state, evaluate: expression => vm.runInContext(expression, context) };
+}
+function exportedSettings(code) {
+  const block = code.match(/^const SETTINGS = (\{[\s\S]*?^\});/m);
+  return vm.runInNewContext(`(${block[1]})`);
 }
 
 for (const design of ['solid', 'image']) {
-  test(`${design} preview: carrier samples match the standalone scripts`, async () => {
-    const { elements: el, evaluate } = preview(design, '?image=');
+  test(`${design}: carrier samples and all states render with one execution timestamp`, async () => {
+    const { elements: el, evaluate } = preview(`?design=${design}`);
     for (const carrier of ['telcel', 'bait']) {
       const { hooks } = await loadWidget(design, { carrier });
       assert.deepEqual(JSON.parse(JSON.stringify(evaluate(`SAMPLES.${carrier}`))), JSON.parse(JSON.stringify(hooks.SAMPLE_DATA)));
-      el.carrier.value = carrier;
-      el.carrier.emit('change');
+      el.carrier.value = carrier; el.carrier.emit('change');
       assert.equal(el.remaining.textContent, carrier === 'bait' ? '13.5' : '1.6');
       assert.equal(el.execution.textContent, `Última ejecución · ${evaluate('formatRunTime(RUN_AT)')}`);
-      assert.equal(el.timestamp, undefined);
+      for (const mode of ['stale', 'error', 'setup']) {
+        el.state.value = mode; el.state.emit('change');
+        assert.equal(el.usage.hidden, mode !== 'stale');
+        assert.equal(el.empty.hidden, mode === 'stale');
+        assert.equal(el.execution.hidden, false);
+      }
+      el.state.value = 'success'; el.state.emit('change');
     }
-  });
-
-  test(`${design} preview: empty, stale and reduced-speed states`, () => {
-    const { elements: el } = preview(design, '?carrier=bait&state=throttled&image=');
+    el.state.value = 'throttled'; el.state.emit('change');
     assert.equal(el.remaining.textContent, '105.0');
     assert.match(el.available.textContent, /^Velocidad reducida/);
-    el.state.value = 'stale'; el.state.emit('change');
-    assert.equal(el.warning.hidden, false);
-    for (const state of ['error', 'setup']) {
-      el.state.value = state; el.state.emit('change');
-      assert.equal(el.usage.hidden, true);
-      assert.equal(el.empty.hidden, false);
-      assert.match(el.execution.textContent, /^Última ejecución · /);
-      assert.equal(el.execution.hidden, false);
-      assert.match(el['empty-title'].textContent, state === 'setup' ? /Configura Bait/ : /No se pudo cargar/);
-    }
-    el.state.value = 'throttled'; el.carrier.value = 'telcel'; el.carrier.emit('change');
+    el.carrier.value = 'telcel'; el.carrier.emit('change');
     assert.equal(el.state.value, 'success');
     assert.equal(el['throttled-option'].disabled, true);
-    assert.equal(el.usage.hidden, false);
-    assert.equal(el.warning.hidden, true);
   });
-
-  test(`${design} preview: valid settings can be copied, invalid colors preserve the applied background`, () => {
-    const { elements: el, evaluate } = preview(design, '?hex=%23abcdef&image=', 390);
-    assert.equal(el.card.style.backgroundColor, '#ABCDEF');
-    assert.equal(el.frame.style.width, '255px');
-    el.hex.value = 'invalid'; el.hex.emit('input');
-    assert.equal(el['color-error'].hidden, false);
-    assert.equal(el.card.style.backgroundColor, '#ABCDEF');
-    el['color-picker'].value = '#123456'; el['color-picker'].emit('input');
-    assert.equal(el.hex.value, '123456');
-    assert.equal(el['color-error'].hidden, true);
-    const settings = evaluate(`({${el.settings.value}})`);
-    assert.equal(settings.backgroundHex, '123456');
-    assert.equal('backgroundImageUrl' in settings, design === 'image');
-  });
+  for (const carrier of ['telcel', 'bait']) {
+    test(`${carrier}/${design}: exported code comes from the canonical script and changes only selected settings`, async () => {
+      const url = 'https://example.com/a,b.jpg?q="quote"&cash=$&';
+      const { elements: el, state } = preview(`?carrier=${carrier}&design=${design}&hex=123456&overlay=0.4&image=${encodeURIComponent(url)}&state=error`);
+      assert.equal(state.requests.length, 0, 'Source loads only on generation');
+      await el['generate-code'].emit('click');
+      assert.equal(state.requests[0].url, `../${carrier}/${design}.js`);
+      assert.equal(el['code-output'].hidden, false);
+      const code = el.code.value;
+      const settings = exportedSettings(code);
+      assert.equal(settings.backgroundHex, '123456');
+      assert.equal(settings.useSampleData, false);
+      assert.equal(settings.debug, false);
+      if (design === 'image') {
+        assert.equal(settings.backgroundImageUrl, url);
+        assert.equal(settings.backgroundOverlayOpacity, 0.4);
+      } else {
+        assert.equal(settings.backgroundImageUrl, undefined);
+        assert.equal(state.images.length, 0);
+      }
+      const outsideSettings = value => value.replace(/^const SETTINGS = \{[\s\S]*?^\};/m, 'SETTINGS');
+      assert.equal(outsideSettings(code), outsideSettings(sourceFor(carrier, design)));
+      assert.doesNotThrow(() => new vm.Script(`(async () => {${code}\n})`));
+      el['download-code'].emit('click');
+      assert.equal(state.downloads[0].filename, `${carrier}-${design}.js`);
+      assert.equal(await state.blobs[0].text(), code);
+      await el['copy-code'].emit('click');
+      assert.equal(state.copied[0], code);
+    });
+  }
 }
 
-test('image preview: load failure and empty states use the solid background', () => {
-  const { elements: el } = preview('image', '?image=https://example.com/background.jpg&overlay=4');
-  assert.equal(el.opacity.value, '1');
+test('solid mode never fetches backgrounds; image loading starts only when needed', () => {
+  const { elements: el, state } = preview('?image=https://example.com/a.jpg');
+  assert.equal(state.images.length, 0);
+  assert.equal(el['image-settings'].hidden, true);
+  el.design.value = 'image'; el.design.emit('change');
+  assert.equal(state.images.length, 1);
   el.background.onload();
   assert.equal(el.background.hidden, false);
   assert.equal(el.card.classList.contains('has-background'), true);
+  el.opacity.value = '0.4'; el.opacity.emit('input');
+  assert.equal(state.images.length, 1);
+  assert.equal(el.card.style['--overlay-opacity'], '0.4');
   el.state.value = 'setup'; el.state.emit('change');
   assert.equal(el.background.hidden, true);
-  el.state.value = 'success'; el.state.emit('change');
-  assert.equal(el.background.hidden, false);
-  el.background.onerror();
-  assert.equal(el.background.hidden, true);
-  assert.equal(el.card.classList.contains('has-background'), false);
-  el['image-url'].value = ''; el['apply-image'].emit('click');
+  el.design.value = 'solid'; el.design.emit('change');
   assert.equal(el.background.src, undefined);
-  assert.match(el.settings.value, /backgroundImageUrl: ""/);
+  assert.equal(el.background.onload, null);
+  assert.equal(el.card.classList.contains('has-background'), false);
+  el.state.value = 'success'; el.state.emit('change');
+  assert.equal(state.images.length, 1);
 });
 
-test('image preview: rejected URLs preserve the selected image and settings', () => {
-  const { elements: el } = preview('image', '?image=https://example.com/background.jpg');
-  const settings = el.settings.value;
-  el['image-url'].value = 'javascript:alert(1)'; el['apply-image'].emit('click');
-  assert.equal(el['image-url']['aria-invalid'], 'true');
-  assert.equal(el.background.src, 'https://example.com/background.jpg');
-  assert.equal(el.settings.value, settings);
-  el.opacity.value = '0.4'; el.opacity.emit('input');
-  assert.equal(el.card.style['--overlay-opacity'], '0.4');
-  assert.match(el.settings.value, /backgroundOverlayOpacity: 0.4/);
+test('image failures, blank URLs, and invalid schemes use the solid background', async () => {
+  const { elements: el, state } = preview('?design=image');
+  assert.equal(state.images.length, 0);
+  el['image-url'].value = 'javascript:alert(1)'; el['image-url'].emit('input');
+  assert.equal(el['generate-code'].disabled, true);
+  await el['generate-code'].emit('click');
+  assert.equal(state.requests.length, 0);
+  el['image-url'].value = 'https://example.com/a.jpg'; el['image-url'].emit('input'); el['image-url'].emit('change');
+  el.background.onerror();
+  assert.equal(el.background.hidden, true);
+  assert.match(el['image-status'].textContent, /No se pudo cargar/);
+  el['image-url'].value = ''; el['image-url'].emit('input'); el['image-url'].emit('change');
+  assert.equal(el.background.src, undefined);
+  await el['generate-code'].emit('click');
+  assert.equal(exportedSettings(el.code.value).backgroundImageUrl, '');
+});
+
+test('invalid colors preserve the applied preview and prevent stale exports', async () => {
+  const { elements: el, state } = preview('?hex=%23abcdef', { width: 390 });
+  assert.equal(el.card.style.backgroundColor, '#ABCDEF');
+  assert.equal(el.frame.style.width, '255px');
+  await el['generate-code'].emit('click');
+  el.hex.value = 'invalid'; el.hex.emit('input');
+  assert.equal(el['color-error'].hidden, false);
+  assert.equal(el.card.style.backgroundColor, '#ABCDEF');
+  assert.equal(el.code.value, '');
+  assert.equal(el['copy-code'].disabled, true);
+  assert.equal(el['generate-code'].disabled, true);
+  el['color-picker'].value = '#123456'; el['color-picker'].emit('input');
+  assert.equal(el.hex.value, '123456');
+  await el['generate-code'].emit('click');
+  assert.equal(exportedSettings(el.code.value).backgroundHex, '123456');
+  assert.equal(state.requests.length, 1, 'Canonical source reused, with new appearance settings');
+  el.carrier.value = 'bait'; el.carrier.emit('change');
+  assert.equal(el.code.value, '');
+  assert.equal(el['download-code'].disabled, true);
+});
+
+test('changed selections discard in-flight exports', async () => {
+  let finish;
+  const { elements: el } = preview('', { fetch: () => new Promise(resolve => { finish = resolve; }) });
+  const pending = el['generate-code'].emit('click');
+  el.carrier.value = 'bait'; el.carrier.emit('change');
+  finish({ ok: true, text: async () => sourceFor('telcel', 'solid') });
+  await pending;
+  assert.equal(el.code.value, '');
+  assert.equal(el['copy-code'].disabled, true);
+  assert.equal(el['generate-code'].disabled, false);
+  assert.match(el['code-status'].textContent, /Cambiaste los ajustes/);
+});
+
+test('file previews explain hosted generation without attempting local file fetches', async () => {
+  const { elements: el, state } = preview('', { protocol: 'file:' });
+  await el['generate-code'].emit('click');
+  assert.equal(state.requests.length, 0);
+  assert.equal(el['code-output'].hidden, true);
+  assert.match(el['code-status'].textContent, /generador en línea/);
+});
+
+test('source failures are recoverable and never expose partial or invalid code', async () => {
+  for (const reply of [null, { ok: false }, { ok: true, text: async () => '<html>Not a script</html>' },
+    { ok: true, text: async () => sourceFor('telcel', 'solid').replace('  backgroundHex:', '  renamed:') }]) {
+    let fail = true;
+    const { elements: el } = preview('', { fetch: async () => {
+      if (fail) { if (!reply) throw new Error(); return reply; }
+      return { ok: true, text: async () => sourceFor('telcel', 'solid') };
+    } });
+    await el['generate-code'].emit('click');
+    assert.equal(el.code.value, '');
+    assert.equal(el['copy-code'].disabled, true);
+    assert.match(el['code-status'].textContent, /No se pudo cargar/);
+    fail = false;
+    await el['generate-code'].emit('click');
+    assert.equal(el['copy-code'].disabled, false);
+  }
+});
+
+test('clipboard failure selects the full code for manual copying', async () => {
+  const { elements: el } = preview('', { copyError: true });
+  await el['generate-code'].emit('click');
+  await el['copy-code'].emit('click');
+  assert.equal(el.code.focused, true);
+  assert.equal(el.code.selected, true);
+  assert.match(el['code-status'].textContent, /manualmente/);
 });

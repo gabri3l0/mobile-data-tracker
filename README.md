@@ -9,18 +9,20 @@ connect directly to your carrier.
 
 ## Get started
 
+Not sure how to configure a script? **[Create your widget visually](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: choose your carrier, adjust the background, and generate the complete code to paste into Scriptable.
+
 Open the **[widget guide](widgets/README.md)** to choose your script and install
 it on your iPhone. It also covers customization, refresh behavior, and debugging.
 No server or computer is needed.
 
 ## Preview
 
-Choose Telcel or Bait in either preview to try colors, backgrounds, and sample states.
+Click a screenshot to open the generator with that carrier and design selected.
 
 | Carrier | Solid color | Background image | Get code |
 | --- | :---: | :---: | --- |
-| Telcel | [<img src="widgets/screenshots/telcel_solid.png" alt="Telcel · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=telcel) | [<img src="widgets/screenshots/telcel_image.png" alt="Telcel · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=telcel) | [Telcel widgets](widgets/telcel/) |
-| Bait | [<img src="widgets/screenshots/bait_solid.png" alt="Bait · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=bait) | [<img src="widgets/screenshots/bait_image.png" alt="Bait · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=bait) | [Bait widgets](widgets/bait/) |
+| Telcel | [<img src="widgets/screenshots/telcel_solid.png" alt="Telcel · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=telcel) | [<img src="widgets/screenshots/telcel_image.png" alt="Telcel · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=telcel) | [Telcel widgets](widgets/telcel/) |
+| Bait | [<img src="widgets/screenshots/bait_solid.png" alt="Bait · solid color" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=bait) | [<img src="widgets/screenshots/bait_image.png" alt="Bait · background image" width="180">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=bait) | [Bait widgets](widgets/bait/) |
 
 ## Widget features
 

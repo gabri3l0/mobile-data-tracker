@@ -6,17 +6,19 @@ Consulta tus datos restantes y la vigencia de tu paquete desde la pantalla de in
 Cada widget consulta directamente a Telcel o Bait: copia un solo script, sin servidor
 ni computadora. Android aún no es compatible.
 
-| Operador | Diseño | Vista previa | Script | Personalizar |
-| --- | --- | --- | --- | --- |
-| Telcel | Color sólido | [<img src="screenshots/telcel_solid.png" alt="Telcel · color sólido" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=telcel) | [solid.js](telcel/solid.js) | [Ajustes](#personalizar) |
-| Telcel | Imagen de fondo | [<img src="screenshots/telcel_image.png" alt="Telcel · imagen de fondo" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=telcel) | [image.js](telcel/image.js) | [Ajustes](#personalizar) |
-| Bait | Color sólido | [<img src="screenshots/bait_solid.png" alt="Bait · color sólido" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html?carrier=bait) | [solid.js](bait/solid.js) | [Ajustes](#personalizar) |
-| Bait | Imagen de fondo | [<img src="screenshots/bait_image.png" alt="Bait · imagen de fondo" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html?carrier=bait) | [image.js](bait/image.js) | [Ajustes](#personalizar) |
+| Operador | Diseño | Vista previa | Script | Personalizar | Generar código |
+| --- | --- | --- | --- | --- | --- |
+| Telcel | Color sólido | [<img src="screenshots/telcel_solid.png" alt="Telcel · color sólido" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=telcel) | [solid.js](telcel/solid.js) | [Ajustes](#personalizar) | [Crear widget](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=telcel) |
+| Telcel | Imagen de fondo | [<img src="screenshots/telcel_image.png" alt="Telcel · imagen de fondo" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=telcel) | [image.js](telcel/image.js) | [Ajustes](#personalizar) | [Crear widget](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=telcel) |
+| Bait | Color sólido | [<img src="screenshots/bait_solid.png" alt="Bait · color sólido" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=bait) | [solid.js](bait/solid.js) | [Ajustes](#personalizar) | [Crear widget](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=solid&carrier=bait) |
+| Bait | Imagen de fondo | [<img src="screenshots/bait_image.png" alt="Bait · imagen de fondo" width="120">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=bait) | [image.js](bait/image.js) | [Ajustes](#personalizar) | [Crear widget](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?design=image&carrier=bait) |
 
 ## Instalar en iPhone
 
+¿No sabes cómo editar el código? Usa el **[generador de widgets](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: elige tu operador y diseño, ajusta el color o la imagen y el oscurecimiento, y pulsa **Generar código** y **Copiar código**. También puedes descargar el archivo `.js` completo.
+
 1. Instala [Scriptable](https://scriptable.app) en tu iPhone.
-2. Crea un script, pega todo el archivo JS que elegiste y ponle un nombre.
+2. Crea un script, pega el código generado o todo el archivo JS que elegiste y ponle un nombre.
 3. Ejecútalo con ▶ y guarda los datos de tu cuenta: Telcel pide tu número de
    10 dígitos y contraseña de Mi Telcel; Bait solo pide tu número de 10 dígitos.
 4. Agrega un **widget pequeño de Scriptable** a tu pantalla de inicio. Edita el
@@ -58,7 +60,7 @@ respuesta. Al terminar, vuelve a ponerlo en `false`.
 
 ## Personalizar
 
-Edita el bloque `SETTINGS` señalado al inicio del archivo JS que elegiste:
+Usa el [generador](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/) para configurarlo visualmente, o edita el bloque `SETTINGS` señalado al inicio del JS:
 
 | Ajuste | Qué cambiar |
 | --- | --- |
@@ -66,9 +68,9 @@ Edita el bloque `SETTINGS` señalado al inicio del archivo JS que elegiste:
 | `backgroundImageUrl` | Solo para el diseño con imagen: reemplázalo con la URL de tu imagen. Usa `""` para un fondo de color sólido. |
 | `backgroundOverlayOpacity` | Solo para el diseño con imagen: `0` no oscurece la imagen; `1` la cubre de negro. |
 
-Abre la [vista de color sólido](previews/solid.html) o la [vista con imagen](previews/image.html)
-en tu navegador para probar colores, imágenes, operadores y estados con datos de
-ejemplo. Copia los valores generados a `SETTINGS`; las vistas previas no editan tu JS.
+La [vista previa y generador](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/) muestra datos de ejemplo y genera un script completo para consultar tu consumo real. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain. El código se obtiene de los archivos JS de cada operador.
+
+Para desarrollar localmente, ejecuta `python3 -m http.server 8080` desde la raíz del repositorio y abre `http://localhost:8080/widgets/previews/`. Abrir `index.html` directamente permite ver la vista previa, pero para generar código necesitas HTTP o la página publicada.
 
 Para probar datos de ejemplo en Scriptable, activa `useSampleData: true`. Elige
 `sampleState`: `success`, `stale`, `error` o `setup`; Bait también admite `throttled`
@@ -81,7 +83,7 @@ consultar tu consumo real.
 widgets/
 ├── telcel/       Scripts independientes de Telcel: solid.js e image.js
 ├── bait/         Scripts independientes de Bait: solid.js e image.js
-├── previews/     Vistas HTML con datos de ejemplo
+├── previews/     Una vista HTML con generador de código
 ├── screenshots/  Imágenes de los widgets para la documentación
 ├── tests/        Pruebas con Scriptable simulado y respuestas de ejemplo
 ├── README.md     Guía en inglés
