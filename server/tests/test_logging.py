@@ -5,7 +5,7 @@ from src.exceptions import CarrierError
 
 
 @pytest.mark.parametrize("level", ["INFO", "DEBUG"])
-def test_raw_response_and_endpoint_are_only_logged_at_debug(carrier, caplog, level):
+def test_raw_response_and_endpoint_are_never_logged(carrier, caplog, level):
     carrier.payload = {"estatus": "ok", "token": "private-token"}
     with caplog.at_level(level, logger="src"):
         assert carrier.provider.login() == "private-token"
@@ -13,7 +13,7 @@ def test_raw_response_and_endpoint_are_only_logged_at_debug(carrier, caplog, lev
     for secret in ("test-user", "test-password"):
         assert secret not in caplog.text
     for detail in ("private-token", "https://carrier.example/login"):
-        assert (detail in caplog.text) == (level == "DEBUG")
+        assert detail not in caplog.text
 
 
 def test_http_error_logs_status_without_request_details(carrier, caplog):
@@ -36,3 +36,17 @@ def test_connection_error_omits_exception_details(carrier, caplog, monkeypatch):
     assert "connection or timeout" in caplog.text
     assert "private.example" not in caplog.text
     assert "private-token" not in caplog.text
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG"])
+def test_token_exchange_never_logs_tokens_or_upstream_body(carrier, caplog, level):
+    carrier.payload = {
+        "message": "Éxito.",
+        "tokenResponse": {"tokens": [{"id": "token:b2f", "access_token": "private-access-token"}]},
+        "private_response_field": "private-response-value",
+    }
+    with caplog.at_level(level, logger="src"):
+        assert carrier.provider.get_access_token(login_token="private-sso-token") == "private-access-token"
+    for secret in ("private-sso-token", "private-access-token", "private-response-value",
+                   "carrier.example", "test-basic", "test-user"):
+        assert secret not in caplog.text

@@ -1,10 +1,10 @@
 # Central server
 
-Python CLI and FastAPI service for reading mobile data usage. Its goal is to track
-family accounts and provide daily consumption, history, and trends.
+Python CLI and FastAPI service for reading mobile data usage from **Telcel and Bait**.
+Both carriers support the CLI and usage API, with one account per request.
 
-Supports Telcel and Bait, with one account per request. Saved accounts,
-scheduled collection, and analytics are planned.
+The longer-term goal is tracking family accounts, daily consumption, history, and
+trends. Saved accounts, scheduled collection, and analytics are future work.
 
 ## Folder structure
 
@@ -35,6 +35,7 @@ server/
 - Bait high-speed balances with automatic fallback to throttled data.
 - API keys and usage limits per person.
 - Sanitized API errors; credentials, tokens, and readings are not saved.
+- Diagnostic logs omit credentials, tokens, request URLs, and response bodies.
 - SSO logout attempted after each Telcel reading, including failed requests.
 
 ## Limits

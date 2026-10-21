@@ -32,10 +32,7 @@ class TelcelProvider:
         error_type = CarrierError
         try:
             response = self._http.request(method, url, **kwargs)
-            logger.debug(
-                "Telcel response from %s (HTTP %s): %s",
-                url, response.status_code, response.text,
-            )
+            logger.debug("Telcel response received (HTTP %s).", response.status_code)
             response.raise_for_status()
             result = response.json()
             if isinstance(result, dict):
