@@ -3,33 +3,35 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from mobile_data_tracker.models import CarrierConfig
-from mobile_data_tracker.providers.carrier import CarrierProvider
+from src.providers.telcel.config import TelcelConfig
+from src.providers.telcel.provider import TelcelProvider
 
 
 @pytest.fixture
 def carrier(monkeypatch):
     """Provide a carrier backed entirely by an in-memory HTTP transport."""
-    state = SimpleNamespace(requests=[], payload={}, status=200, content=None)
+    state = SimpleNamespace(requests=[], payload={}, status=200, content=None, payloads=[])
 
     def respond(request):
         state.requests.append(request)
         if state.content is not None:
             return httpx.Response(state.status, content=state.content)
-        return httpx.Response(state.status, json=state.payload)
+        payload = state.payloads.pop(0) if state.payloads else state.payload
+        return httpx.Response(state.status, json=payload)
 
-    config = CarrierConfig(
+    config = TelcelConfig(
         username="test-user", password="test-password", basic_auth="test-basic",
         site_domain="https://carrier.example", scope="test-scope",
         login_url="https://carrier.example/login",
         token_url="https://carrier.example/token",
         home_url="https://carrier.example/home",
+        revoke_url="https://carrier.example/revoke",
     )
     with httpx.Client(transport=httpx.MockTransport(respond)) as http:
         monkeypatch.setattr(
-            "mobile_data_tracker.providers.carrier.httpx.Client", lambda **kwargs: http,
+            "src.providers.telcel.provider.httpx.Client", lambda **kwargs: http,
         )
-        state.provider = CarrierProvider(config)
+        state.provider = TelcelProvider(config)
         state.http = http
         yield state
 

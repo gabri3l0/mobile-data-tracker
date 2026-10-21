@@ -1,15 +1,15 @@
 import httpx
 import pytest
 
-from mobile_data_tracker.providers.carrier import CarrierError
+from src.exceptions import CarrierError
 
 
 @pytest.mark.parametrize("level", ["INFO", "DEBUG"])
 def test_raw_response_and_endpoint_are_only_logged_at_debug(carrier, caplog, level):
     carrier.payload = {"estatus": "ok", "token": "private-token"}
-    with caplog.at_level(level, logger="mobile_data_tracker"):
+    with caplog.at_level(level, logger="src"):
         assert carrier.provider.login() == "private-token"
-    assert "Carrier login successful" in caplog.text
+    assert "Telcel login successful" in caplog.text
     for secret in ("test-user", "test-password"):
         assert secret not in caplog.text
     for detail in ("private-token", "https://carrier.example/login"):
@@ -18,7 +18,7 @@ def test_raw_response_and_endpoint_are_only_logged_at_debug(carrier, caplog, lev
 
 def test_http_error_logs_status_without_request_details(carrier, caplog):
     carrier.status = 401
-    with caplog.at_level("INFO", logger="mobile_data_tracker"):
+    with caplog.at_level("INFO", logger="src"):
         with pytest.raises(CarrierError):
             carrier.provider.login()
     assert "HTTP 401" in caplog.text

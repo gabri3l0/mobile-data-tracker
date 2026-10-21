@@ -1,7 +1,16 @@
 # Mobile data widgets
 
 Show your remaining mobile data on your iPhone with Scriptable.
-You need a running usage API. See the [backend guide](../docs/backend.md).
+These widgets provide a personal view of current account usage on the device.
+Today they need a running usage API; see the [central server guide](../server/README.md).
+Standalone access to the carrier from Scriptable is planned for a later change.
+
+## Contents
+
+- [Dark](dark/README.md): compact widget with a dark background.
+- [Image](image/README.md): widget with a configurable image background.
+- [Shared helper](shared/README.md): usage requests, validation, caching, and retries.
+- [Screenshots](screenshots/README.md): preview images used in the project README.
 
 ## Preview on your computer
 
