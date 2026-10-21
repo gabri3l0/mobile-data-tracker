@@ -27,7 +27,7 @@ Choose Telcel or Bait in either preview to try colors, backgrounds, and sample s
 - Solid hex-color and customizable image-background widgets.
 - One self-contained script per carrier and design, with Keychain setup.
 - Cached readings available when updates fail.
-- Separate timestamps for usage readings and script execution.
+- One timestamp showing the latest widget execution, including failed updates.
 - Bearer-protected API with limits per person.
 - CLI access and browser previews.
 

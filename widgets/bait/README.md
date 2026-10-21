@@ -19,5 +19,4 @@ y elige **Cambiar datos**. La lectura se guarda 30 minutos y se conserva si fall
 una actualización. iOS decide cuándo refrescar el widget.
 
 Se muestran primero los datos de alta velocidad y, al agotarse, los de velocidad
-reducida. Los MB se convierten usando 1024 por GB. **Consultado** indica cuándo
-se obtuvo la lectura; Bait no entrega una hora de medición.
+reducida. Los MB se convierten usando 1024 por GB.

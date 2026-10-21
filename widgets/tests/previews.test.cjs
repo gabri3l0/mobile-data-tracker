@@ -8,7 +8,7 @@ const { loadWidget } = require('./scriptable-mock.cjs');
 function preview(design, search = '', width = 1000) {
   const html = fs.readFileSync(path.join(__dirname, '../previews', `${design}.html`), 'utf8');
   const elements = {};
-  for (const match of html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
+  for (const match of html.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/gi)) {
     const tag = match[0];
     const listeners = {};
     const classes = new Set();
@@ -42,7 +42,8 @@ for (const design of ['solid', 'image']) {
       el.carrier.value = carrier;
       el.carrier.emit('change');
       assert.equal(el.remaining.textContent, carrier === 'bait' ? '13.5' : '1.6');
-      assert.match(el.timestamp.textContent, carrier === 'bait' ? /^Consultado/ : /^Actualizado/);
+      assert.equal(el.execution.textContent, `Última ejecución · ${evaluate('formatRunTime(RUN_AT)')}`);
+      assert.equal(el.timestamp, undefined);
     }
   });
 
@@ -56,6 +57,8 @@ for (const design of ['solid', 'image']) {
       el.state.value = state; el.state.emit('change');
       assert.equal(el.usage.hidden, true);
       assert.equal(el.empty.hidden, false);
+      assert.match(el.execution.textContent, /^Última ejecución · /);
+      assert.equal(el.execution.hidden, false);
       assert.match(el['empty-title'].textContent, state === 'setup' ? /Configura Bait/ : /No se pudo cargar/);
     }
     el.state.value = 'throttled'; el.carrier.value = 'telcel'; el.carrier.emit('change');

@@ -128,8 +128,7 @@ for (const design of ['solid', 'image']) {
     assert.equal(saved.password, undefined);
     assert.equal(saved.serviceKey, undefined);
     assert.equal(state.keys.has(KEY), false);
-    assert.ok(state.texts.some(value => value.startsWith('Consultado · ')));
-    assert.ok(!state.texts.some(value => value.startsWith('Actualizado · ')));
+    assert.ok(state.texts.some(value => value.startsWith('Última ejecución · ')));
   });
 
   test(`${design} Bait: cancellation and invalid phone never query the carrier`, async () => {
@@ -217,6 +216,8 @@ for (const design of ['solid', 'image']) {
       assert.equal(state.requests.length, 0);
       assert.equal(state.prompts.length, 0);
       assert.equal(state.completed, 1);
+      assert.equal(state.texts.filter(value => /^(Última ejecución|Actualizado|Consultado|Ejecutado) · /.test(value)).length, 1);
+      assert.ok(state.texts.some(value => value.startsWith('Última ejecución · ')));
       if (sampleState === 'throttled') {
         assert.ok(state.texts.some(value => value.startsWith('Velocidad reducida')));
         assert.ok(state.texts.includes('105.0'));

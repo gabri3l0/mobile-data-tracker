@@ -349,10 +349,6 @@ function clampPercentage(value) {
     : 0;
 }
 
-function formatReading(value) {
-  return formatRunTime(new Date(value));
-}
-
 function formatExpiration(value) {
   const [, month, day] = value.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -366,7 +362,7 @@ function formatRunTime(date) {
 
 function addExecutionTime(widget) {
   widget.addSpacer(3);
-  addText(widget, `Ejecutado · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
+  addText(widget, `Última ejecución · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
 }
 
 function drawProgressBar(percentage) {
@@ -447,7 +443,6 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
     widget.addSpacer(3);
   }
-  addText(widget, `Consultado · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
   if (updateFailed) {
     widget.addSpacer(3);
     addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.accent);

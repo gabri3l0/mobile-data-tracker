@@ -32,7 +32,6 @@
     .percentage { margin-top: 3px; font-size: 9px; line-height: 11px; color: #929298; }
     .footer { margin-top: auto; color: #929298; }
     .expiration { font-size: 9px; line-height: 11px; }
-    .timestamp { font-size: 8px; line-height: 10px; margin-top: 3px; font-variant-numeric: tabular-nums; }
     .execution { flex-shrink: 0; font-size: 7px; line-height: 9px; margin-top: 3px; color: #929298; font-variant-numeric: tabular-nums; }
     .warning { color: var(--accent, #ff453a); font-size: 8px; line-height: 10px; margin-top: 3px; white-space: pre-line; }
     .empty { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
@@ -76,7 +75,7 @@
     <p class="intro">Widget pequeño · Datos de ejemplo · Sin consultas a tu cuenta</p>
     <div class="controls">
       <label>Operador<select id="carrier"><option value="telcel">Telcel</option><option value="bait">Bait</option></select></label>
-      <label>Estado<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+      <label>Estado<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
       <label>Color de fondo<span class="color-control"><input id="color-picker" type="color" value="#101012" aria-label="Selector de color"><input id="hex" type="text" value="101012" maxlength="7" spellcheck="false" aria-label="Color hexadecimal" aria-describedby="color-error"></span></label>
     </div>
     <p class="status validation" id="color-error" role="status" hidden>Usa seis dígitos hexadecimales, por ejemplo 101012.</p>
@@ -96,7 +95,7 @@
             <div class="track" role="progressbar" aria-label="Datos utilizados" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="fill" id="fill"></div></div>
             <div class="percentage" id="percentage"></div>
           </section>
-          <footer class="footer" id="footer"><div class="expiration" id="expiration"></div><div class="timestamp" id="timestamp"></div><div class="warning" id="warning" hidden>No se pudo actualizar</div></footer>
+          <footer class="footer" id="footer"><div class="expiration" id="expiration"></div><div class="warning" id="warning" hidden>No se pudo actualizar</div></footer>
           <section class="empty" id="empty" hidden><strong id="empty-title">No se pudo cargar</strong><span id="empty-detail">Intenta más tarde</span></section>
           <div class="execution" id="execution"></div>
         </article>
@@ -213,7 +212,7 @@ function render() {
   $("empty").hidden = !empty;
   $("empty-title").textContent = state === "setup" ? `Configura ${name}` : "No se pudo cargar";
   $("empty-detail").textContent = state === "setup" ? "Abre Scriptable para configurar" : "Intenta más tarde";
-  $("execution").textContent = `Ejecutado · ${formatRunTime(RUN_AT)}`;
+  $("execution").textContent = `Última ejecución · ${formatRunTime(RUN_AT)}`;
   updateBackgroundVisibility();
   if (empty) return;
   $("remaining").textContent = data.remaining_gb.toFixed(1);
@@ -226,13 +225,6 @@ function render() {
   const [, month, day] = data.expiration_date.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
-  if (isBait) {
-    $("timestamp").textContent = `Consultado · ${formatRunTime(new Date(data.last_updated))}`;
-  } else {
-    const [date, time] = data.last_updated.split("T");
-    const [year, readingMonth, readingDay] = date.split("-");
-    $("timestamp").textContent = `Actualizado · ${readingDay}/${readingMonth}/${year.slice(-2)} ${time.slice(0, 5)}`;
-  }
   $("warning").hidden = state !== "stale";
 }
 

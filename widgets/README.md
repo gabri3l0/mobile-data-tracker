@@ -30,6 +30,9 @@ La lectura se guarda 30 minutos. Si falla una consulta, se conserva la anterior 
 se reintenta después de 15 minutos, o cuando indique el operador si limita las
 consultas. iOS decide cuándo refrescar el widget.
 
+**Última ejecución** muestra cuándo corrió el script, incluso si usó datos
+guardados o falló la consulta.
+
 Para cambiar tu cuenta, ejecuta el script y elige **Cambiar datos**.
 
 ## Pruebas

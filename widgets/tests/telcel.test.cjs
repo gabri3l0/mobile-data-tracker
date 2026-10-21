@@ -132,7 +132,7 @@ for (const design of ['solid', 'image']) {
     assert.equal(state.previews, 1);
     assert.equal(state.completed, 1);
     assert.ok(state.texts.includes('15.0'));
-    assert.ok(state.texts.includes('Actualizado · 30/12/26 14:35'));
+    assert.ok(state.texts.some(value => value.startsWith('Última ejecución · ')));
     assert.equal(state.widget.backgroundColor.hex, '101012');
     assert.ok(state.widget.refreshAfterDate.getTime() > NOW);
   });
@@ -215,6 +215,8 @@ for (const design of ['solid', 'image']) {
       assert.equal(state.prompts.length, 0);
       assert.equal(state.previews, 1);
       assert.equal(state.completed, 1);
+      assert.equal(state.texts.filter(value => /^(Última ejecución|Actualizado|Consultado|Ejecutado) · /.test(value)).length, 1);
+      assert.ok(state.texts.some(value => value.startsWith('Última ejecución · ')));
       if (sampleState === 'setup') assert.ok(state.texts.includes('Abre Scriptable para configurar'));
       if (sampleState === 'stale') assert.ok(state.texts.includes('No se pudo actualizar'));
     });

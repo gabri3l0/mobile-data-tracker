@@ -332,13 +332,6 @@ function clampPercentage(value) {
     : 0;
 }
 
-function formatReading(value) {
-  // Preserve the carrier's wall-clock reading: its timestamp has no timezone.
-  const [date, time] = value.split("T");
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year.slice(-2)} ${time.slice(0, 5)}`;
-}
-
 function formatExpiration(value) {
   const [, month, day] = value.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -352,7 +345,7 @@ function formatRunTime(date) {
 
 function addExecutionTime(widget) {
   widget.addSpacer(3);
-  addText(widget, `Ejecutado · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
+  addText(widget, `Última ejecución · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
 }
 
 function drawProgressBar(percentage) {
@@ -433,7 +426,6 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
     widget.addSpacer(3);
   }
-  addText(widget, `Actualizado · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
   if (updateFailed) {
     widget.addSpacer(3);
     addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.accent);
