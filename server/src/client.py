@@ -1,7 +1,7 @@
 import logging
 
-from mobile_data_tracker.providers.carrier import CarrierProvider
-from mobile_data_tracker.providers.carrier_parser import parse_usage
+from src.providers.carrier import CarrierProvider
+from src.providers.carrier_parser import parse_usage
 
 logger = logging.getLogger(__name__)
 

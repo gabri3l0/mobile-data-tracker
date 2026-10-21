@@ -3,10 +3,10 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from mobile_data_tracker import api
-from mobile_data_tracker.api import app
-from mobile_data_tracker.models import CarrierConfig
-from mobile_data_tracker.providers.carrier import CarrierError, CarrierTimeoutError
+from src import api
+from src.api import app
+from src.models import CarrierConfig
+from src.providers.carrier import CarrierError, CarrierTimeoutError
 
 
 @pytest.fixture(autouse=True)
@@ -16,7 +16,7 @@ def reset_usage_limiter(monkeypatch):
 
 
 def test_health_does_not_contact_carrier():
-    with patch("mobile_data_tracker.providers.carrier.httpx.Client") as carrier_http:
+    with patch("src.providers.carrier.httpx.Client") as carrier_http:
         with TestClient(app) as client:
             response = client.get("/health")
 

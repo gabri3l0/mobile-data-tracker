@@ -2,8 +2,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from mobile_data_tracker.client import MobileDataTracker
-from mobile_data_tracker.providers.carrier_parser import parse_usage
+from src.client import MobileDataTracker
+from src.providers.carrier_parser import parse_usage
 
 
 def test_nested_home_response(home_response):

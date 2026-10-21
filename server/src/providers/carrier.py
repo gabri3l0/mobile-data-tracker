@@ -3,7 +3,7 @@ import logging
 
 import httpx
 
-from mobile_data_tracker.models import CarrierConfig
+from src.models import CarrierConfig
 
 logger = logging.getLogger(__name__)
 

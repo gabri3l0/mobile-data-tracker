@@ -4,7 +4,7 @@ from urllib.parse import parse_qs
 
 import pytest
 
-from mobile_data_tracker.providers.carrier import CarrierError
+from src.providers.carrier import CarrierError
 
 
 def test_login_sends_decoded_password_field_and_encoded_password(carrier):

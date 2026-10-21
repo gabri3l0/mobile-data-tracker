@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from mobile_data_tracker.models import CarrierConfig
-from mobile_data_tracker.providers.carrier import CarrierProvider
+from src.models import CarrierConfig
+from src.providers.carrier import CarrierProvider
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def carrier(monkeypatch):
     )
     with httpx.Client(transport=httpx.MockTransport(respond)) as http:
         monkeypatch.setattr(
-            "mobile_data_tracker.providers.carrier.httpx.Client", lambda **kwargs: http,
+            "src.providers.carrier.httpx.Client", lambda **kwargs: http,
         )
         state.provider = CarrierProvider(config)
         state.http = http

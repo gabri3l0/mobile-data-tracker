@@ -3,9 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
-from mobile_data_tracker.client import MobileDataTracker
-from mobile_data_tracker.models import CarrierConfig
-from mobile_data_tracker.providers.carrier import CarrierProvider
+from src.client import MobileDataTracker
+from src.models import CarrierConfig
+from src.providers.carrier import CarrierProvider
 
 logger = logging.getLogger(__name__)
 
