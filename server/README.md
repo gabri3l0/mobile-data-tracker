@@ -33,6 +33,7 @@ server/
 - CLI and HTTP API backed by the same carrier client.
 - API keys and usage limits per person.
 - Sanitized API errors; credentials, tokens, and readings are not saved.
+- SSO logout attempted after each Telcel reading, including failed requests.
 
 ## Limits
 
@@ -41,6 +42,7 @@ server/
 - Exceeding the limit returns `429` with `Retry-After` in seconds.
 - Counters reset on restart and are per process. Run one server process.
 - Carrier network operations use a 30-second timeout, not a total request deadline.
+- SSO logout uses a 5-second timeout; failures are logged without failing the reading.
 
 ## API keys
 

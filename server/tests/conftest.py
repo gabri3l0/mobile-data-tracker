@@ -25,6 +25,7 @@ def carrier(monkeypatch):
         login_url="https://carrier.example/login",
         token_url="https://carrier.example/token",
         home_url="https://carrier.example/home",
+        revoke_url="https://carrier.example/revoke",
     )
     with httpx.Client(transport=httpx.MockTransport(respond)) as http:
         monkeypatch.setattr(

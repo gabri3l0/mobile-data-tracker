@@ -279,6 +279,6 @@ def test_usage_endpoint_runs_real_telcel_provider_with_mocked_http(carrier, home
         })
     assert response.status_code == 200
     assert response.json() == parse_usage(home_response)
-    assert [r.url.path for r in carrier.requests] == ["/login", "/token", "/home"]
+    assert [r.url.path for r in carrier.requests] == ["/login", "/token", "/home", "/revoke"]
     assert carrier.requests[1].url.params["user"] == "alice"
     assert carrier.http.is_closed

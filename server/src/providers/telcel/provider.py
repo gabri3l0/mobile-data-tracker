@@ -143,8 +143,31 @@ class TelcelProvider:
 
     def get_usage_data(self) -> UsageData:
         login_token = self.login()
-        access_token = self.get_access_token(login_token=login_token)
-        return parse_usage(self.get_home(access_token=access_token))
+        try:
+            access_token = self.get_access_token(login_token=login_token)
+            return parse_usage(self.get_home(access_token=access_token))
+        finally:
+            self.revoke_session(login_token=login_token)
+
+    def revoke_session(self, *, login_token: str) -> None:
+        """Attempt SSO logout without replacing the usage result or its error."""
+        logger.info("Revoking Telcel SSO session.")
+        try:
+            response = self._http.post(
+                self.config.revoke_url,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+                data={"token": login_token, "token_type": "revoke"},
+                timeout=5.0,
+            )
+            response.raise_for_status()
+            # A successful response may have an empty body. Do not log its contents.
+            logger.info("Telcel SSO revocation request completed.")
+        except Exception:
+            # Cleanup must not hide a reading or the original carrier/parser failure.
+            logger.warning("Unable to revoke Telcel SSO session.")
 
     def close(self) -> None:
         logger.debug("Closing Telcel HTTP connections.")

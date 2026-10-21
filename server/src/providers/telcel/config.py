@@ -12,6 +12,7 @@ class TelcelConfig:
     login_url: str = "https://wbl.telcel-id.com:8443/login"
     token_url: str = "https://mi-telcel.smapps.mx/security/1.0.0/v2/token"
     home_url: str = "https://api.journeys.telcel.wavebybemobi.com/api/components/flow/home"
+    revoke_url: str = "https://dev.smapps.mx:9000/sso/revoke"
 
     @classmethod
     def from_env(cls) -> "TelcelConfig":

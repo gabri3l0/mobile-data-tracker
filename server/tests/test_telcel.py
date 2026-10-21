@@ -117,7 +117,7 @@ def test_provider_runs_full_telcel_flow_and_normalizes_usage(carrier, home_respo
         usage = carrier.provider.get_usage_data()
     finally:
         carrier.provider.close()
-    assert [request.url.path for request in carrier.requests] == ["/login", "/token", "/home"]
+    assert [request.url.path for request in carrier.requests] == ["/login", "/token", "/home", "/revoke"]
     assert carrier.requests[1].url.params["token"] == "login-token"
     assert carrier.requests[2].headers["Authorization"] == "Bearer access-token"
     assert usage["remaining_gb"] == 15.0
@@ -136,3 +136,77 @@ def test_network_timeout_uses_shared_timeout_exception(carrier, monkeypatch):
     with pytest.raises(CarrierTimeoutError) as error:
         carrier.provider.login()
     assert "private-request-details" not in str(error.value)
+
+
+def test_revoke_posts_only_sso_token_and_accepts_empty_response(carrier, caplog):
+    carrier.status = 204
+    carrier.content = b""
+    with caplog.at_level("DEBUG", logger="src"):
+        carrier.provider.revoke_session(login_token="private-sso-token")
+    request, = carrier.requests
+    assert request.method == "POST"
+    assert str(request.url) == "https://carrier.example/revoke"
+    assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
+    assert request.headers["Accept"] == "application/json"
+    assert "Authorization" not in request.headers
+    assert parse_qs(request.content.decode()) == {
+        "token": ["private-sso-token"], "token_type": ["revoke"],
+    }
+    assert request.extensions["timeout"]["read"] == 5.0
+    assert "Unable to revoke" not in caplog.text
+    assert "private-sso-token" not in caplog.text
+    assert "carrier.example" not in caplog.text
+
+
+@pytest.mark.parametrize("failure", ["http", "timeout"])
+def test_revoke_failure_does_not_discard_usage(carrier, home_response, monkeypatch, caplog, failure):
+    import httpx
+
+    carrier.payloads = [
+        {"estatus": "ok", "token": "private-sso-token"},
+        {"message": "Éxito.", "tokenResponse": {"tokens": [
+            {"id": "token:b2f", "access_token": "access-token"},
+        ]}},
+        home_response,
+    ]
+
+    def fail_revoke(*args, **kwargs):
+        if failure == "timeout":
+            raise httpx.ReadTimeout("private-sso-token")
+        return httpx.Response(500, request=httpx.Request("POST", "https://private.example/revoke"))
+
+    monkeypatch.setattr(carrier.http, "post", fail_revoke)
+    assert carrier.provider.get_usage_data()["remaining_gb"] == 15.0
+    assert "Unable to revoke Telcel SSO session" in caplog.text
+    assert "private-sso-token" not in caplog.text
+    assert "private.example" not in caplog.text
+
+
+@pytest.mark.parametrize("stage", ["exchange", "home", "parsing"])
+def test_revoke_runs_after_failures_and_preserves_original_error(carrier, monkeypatch, stage):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(carrier.provider, "login", Mock(return_value="sso-token"))
+    exchange = Mock(return_value="b2f-token")
+    home = Mock(return_value={})
+    if stage == "exchange":
+        exchange.side_effect = CarrierError("Original exchange failure")
+    elif stage == "home":
+        home.side_effect = CarrierError("Original home failure")
+    monkeypatch.setattr(carrier.provider, "get_access_token", exchange)
+    monkeypatch.setattr(carrier.provider, "get_home", home)
+    # Even an unexpected cleanup error must not replace the original failure.
+    revoke = Mock(side_effect=RuntimeError("Cleanup failure"))
+    monkeypatch.setattr(carrier.http, "post", revoke)
+    expected = "missing tabs-plans" if stage == "parsing" else f"Original {stage} failure"
+    with pytest.raises((CarrierError, ValueError), match=expected):
+        carrier.provider.get_usage_data()
+    revoke.assert_called_once()
+    assert revoke.call_args.kwargs["data"]["token"] == "sso-token"
+
+
+def test_no_revocation_when_login_does_not_produce_token(carrier):
+    carrier.payload = {"estatus": "failed"}
+    with pytest.raises(CarrierError):
+        carrier.provider.get_usage_data()
+    assert [request.url.path for request in carrier.requests] == ["/login"]
