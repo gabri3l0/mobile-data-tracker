@@ -1,15 +1,14 @@
 # Mobile Data Tracker
 
-Track mobile data usage with two components:
+Check your Telcel or Bait mobile data usage from your home screen. Choose a
+solid-color or image-background widget, copy one script into Scriptable, and
+connect directly to your carrier.
 
-- [Widgets](widgets/README.md): Scriptable widgets for iPhone showing remaining data,
-  plan expiration, and the latest reading on your home screen.
-  Telcel and Bait widgets connect directly to their carriers.
-- [Central server](server/README.md): Python API and CLI for current usage, with the
-  longer-term purpose of tracking family accounts, daily consumption, history, and
-  trends. Those account-management and analytics features are not implemented yet.
+## Get started
 
-The central server supports Telcel and Bait.
+Open the **[widget guide](widgets/README.md)** to choose your script and install
+it on your iPhone. It also covers customization, refresh behavior, and debugging.
+No server or computer is needed.
 
 ## Preview
 
@@ -20,23 +19,22 @@ Choose Telcel or Bait in either preview to try colors, backgrounds, and sample s
 | [<img src="widgets/screenshots/dark.jpg" alt="Solid widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Image 1 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Image 2 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
 | [Open Solid preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [Open Image 1 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [Open Image 2 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
 
-## Features
+## Widget features
 
-- Remaining and used data, with a usage progress bar.
+- Remaining data and a usage progress bar.
 - Plan name, expiration date, and days remaining.
-- Solid hex-color and customizable image-background widgets.
-- One self-contained script per carrier and design, with Keychain setup.
-- Cached readings available when updates fail.
-- One timestamp showing the latest widget execution, including failed updates.
-- Bearer-protected API with limits per person.
-- CLI access and browser previews.
+- Account details stored in iOS Keychain.
+- Customizable solid colors and background images.
+- Saved readings available when updates fail.
+- One timestamp showing when the script last ran.
 
-## Guides
+## Optional central server
 
-- [Central server](server/README.md) — setup, CLI, API, authentication, and tests.
-- [iPhone widgets](widgets/README.md) — designs, Scriptable setup, and refresh behavior.
+The Python CLI and API provide usage readings for both carriers, with API keys
+and limits per person. Family-account tracking, daily consumption, history, and
+trends are future goals.
 
-Run Python commands from `server/` and keep local configuration in `server/.env`.
+See the **[server guide](server/README.md)** for setup, CLI commands, and endpoints.
 
 ## License
 
