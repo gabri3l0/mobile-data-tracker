@@ -13,6 +13,7 @@ server/
 ├── src/
 │   ├── api/         App, routes, schemas, authentication, limits, and errors
 │   ├── providers/
+│   │   ├── bait/       Bait provider and parser (integration pending)
 │   │   └── telcel/     Telcel provider, parser, and configuration
 │   ├── client.py    Carrier selection and shared usage client
 │   ├── models.py    Carrier names and normalized usage type
@@ -124,11 +125,12 @@ parsing failure, `504` carrier timeout, and `500` unexpected failure.
 Import `http://127.0.0.1:8000/openapi.json`, then import
 [bruno/local.env.example.json](bruno/local.env.example.json) as an environment.
 Fill in `username`, `password`, and `api_key` locally and mark them as secret.
+The `carrier` variable defaults to `telcel`; Bait API selection is enabled in Step 2.
 Use `{{base_url}}/v1/usage` with bearer token `{{api_key}}` and this body:
 
 ```json
 {
-  "carrier": "telcel",
+  "carrier": "{{carrier}}",
   "username": "{{username}}",
   "password": "{{password}}"
 }
@@ -141,4 +143,12 @@ Keep the template blank. Reimport the schema after API changes.
 Add its `provider.py`, `parser.py`, and `config.py` under `src/providers/<name>/`.
 The provider implements `get_usage_data()` and `close()`, owns its authentication
 flow, and returns the shared `UsageData` fields. Add carrier selection in the shared client and
-`CarrierName`, and add tests. Bait is planned but not implemented yet.
+`CarrierName`, and add tests. Bait's provider and parser are implemented; client, API, and CLI integration is next.
+
+## Bait provider (Step 1)
+
+The standalone provider reads `BAIT_PHONE` and `BAIT_SERVICE_KEY` from `.env`.
+It shows high-speed data while available, then throttled data, labeled with
+`data_tier`. It converts MB to GB using 1024 and uses fetch time in UTC as
+`last_updated`. Minutes and messages are excluded. API and CLI selection still
+supports Telcel only until Step 2.

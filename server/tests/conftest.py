@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -55,3 +57,8 @@ def home_response():
         "config": {"segments": [{"text": "Faltan "}, {"text": "3 días"}]},
     })
     return {"data": {"components": components}}
+
+
+@pytest.fixture
+def bait_response():
+    return json.loads((Path(__file__).parent / "fixtures/bait_consumption.json").read_text())
