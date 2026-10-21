@@ -3,8 +3,8 @@
 Track mobile data usage with two components:
 
 - [Widgets](widgets/README.md): Scriptable widgets for iPhone showing remaining data,
-  plan expiration, and the latest reading on your home screen. They currently use
-  the server; direct carrier access is planned.
+  plan expiration, and the latest reading on your home screen.
+  [Standalone Telcel widgets](widgets/telcel/README.md) connect directly to the carrier.
 - [Central server](server/README.md): Python API and CLI for current usage, with the
   longer-term purpose of tracking family accounts, daily consumption, history, and
   trends. Those account-management and analytics features are not implemented yet.

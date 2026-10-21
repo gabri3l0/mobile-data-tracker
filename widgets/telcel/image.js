@@ -1,0 +1,530 @@
+// Variables used by Scriptable.
+// icon-color: red; icon-glyph: signal;
+
+const RUN_AT = new Date();
+const SETTINGS = {
+  backgroundHex: "101012", // Six hex digits, without #.
+  backgroundImageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdZaVghFotA_TTTq7zfOxO5AipAmIdJpEJaQ0j4WnVb0BQfW67EaoZPcXC&s=10",
+  backgroundOverlayOpacity: 0.65,
+  backgroundCacheHours: 24,
+  backgroundTimeoutSeconds: 5,
+  cacheMinutes: 30,
+  retryMinutes: 15,
+  requestTimeoutSeconds: 20,
+  debug: false,
+  useSampleData: false,
+  sampleState: "success", // success, stale, error, setup.
+};
+const CLIENT_AUTH = "YlhSd2MyVnlkbWxqWlhNNk55UTROM0ptUm5OM1pTUXlNVjg9";
+const COLORS = {
+  background: SETTINGS.backgroundHex,
+  text: "FFFFFF",
+  muted: "FFFFFF",
+  accent: "FF453A",
+  track: "2C2C30",
+};
+const BAR_WIDTH = 112;
+const BAR_HEIGHT = 7;
+const SAMPLE_DATA = {
+  plan_name: "Plan 7 GB", expiration_date: "2026-10-24", days_until: 5,
+  last_updated: "2026-10-18T01:30:00", total_gb: 7, used_gb: 5.4, remaining_gb: 1.6,
+  used_percentage: 77.14, remaining_percentage: 22.86,
+};
+
+const KEYCHAIN_KEY = "mobile-data-tracker.telcel.credentials.v1";
+const CACHE_FILE = "mobile-data-tracker-telcel-usage-v1.json";
+
+function debugLog(message) {
+  if (SETTINGS.debug) console.log(`[Telcel] ${message}`);
+}
+
+function diagnosticError(code) {
+  const error = new Error("No se pudo consultar Telcel.");
+  error.code = /^(configuration|usage_data|login_rejected|token_missing|(?:login|token|usage|logout)_(?:network|json|http_[1-5]\d{2}))$/.test(code) ? code : "unknown";
+  return error;
+}
+
+function cacheLocation() {
+  const files = FileManager.local();
+  return { files, path: files.joinPath(files.libraryDirectory(), CACHE_FILE) };
+}
+
+function readCredentials() {
+  try {
+    if (!Keychain.contains(KEYCHAIN_KEY)) return null;
+    const value = JSON.parse(Keychain.get(KEYCHAIN_KEY));
+    return value && typeof value.phone === "string" && /^\d{10}$/.test(value.phone) && typeof value.password === "string"
+      && value.password.trim() && typeof value.profileId === "string" && value.profileId
+      ? value : null;
+  } catch {
+    debugLog("No se pudo leer la configuración.");
+    return null;
+  }
+}
+
+async function configureCredentials(existing) {
+  const alert = new Alert();
+  alert.title = "Configurar Telcel";
+  alert.message = "Tus datos se guardan en el Keychain de iOS.";
+  alert.addTextField("Número de 10 dígitos", existing ? existing.phone : "");
+  alert.addSecureTextField("Contraseña Mi Telcel", "");
+  alert.addAction("Guardar");
+  alert.addCancelAction("Cancelar");
+  if (await alert.presentAlert() !== 0) return null;
+  const phone = alert.textFieldValue(0).replace(/[\s()-]/g, "");
+  const password = alert.textFieldValue(1);
+  if (!/^\d{10}$/.test(phone) || !password.trim()) {
+    const notice = new Alert();
+    notice.title = "Revisa tus datos";
+    notice.message = "Ingresa un número de 10 dígitos y tu contraseña de Mi Telcel.";
+    notice.addAction("Aceptar");
+    await notice.presentAlert();
+    return null;
+  }
+  const credentials = { phone, password, profileId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}` };
+  try {
+    Keychain.set(KEYCHAIN_KEY, JSON.stringify(credentials));
+  } catch {
+    const notice = new Alert();
+    notice.title = "No se pudo guardar";
+    notice.message = "Intenta configurar tus datos nuevamente.";
+    notice.addAction("Aceptar");
+    await notice.presentAlert();
+    return null;
+  }
+  try {
+    const { files, path } = cacheLocation();
+    if (files.fileExists(path)) files.remove(path);
+  } catch {
+    // The profile ID also prevents reuse of an old account's cache.
+    debugLog("No se pudo limpiar la lectura anterior.");
+  }
+  return credentials;
+}
+
+async function credentialsForRun() {
+  const existing = readCredentials();
+  if (config.runsInWidget) return { credentials: existing, cancelled: false };
+  if (existing) {
+    const menu = new Alert();
+    menu.title = "Mi Telcel";
+    menu.addAction("Ver widget");
+    menu.addAction("Cambiar datos");
+    menu.addCancelAction("Cancelar");
+    const action = await menu.presentSheet();
+    if (action === 0) return { credentials: existing, cancelled: false };
+    if (action !== 1) return { credentials: existing, cancelled: true };
+  }
+  const credentials = await configureCredentials(existing);
+  return { credentials, cancelled: credentials === null };
+}
+
+function isUsageData(data) {
+  return data !== null && typeof data === "object" && !Array.isArray(data)
+    && typeof data.plan_name === "string"
+    && ["total_gb", "used_gb", "remaining_gb", "days_until"].every(key => typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0)
+    && Number.isInteger(data.days_until)
+    && ["used_percentage", "remaining_percentage"].every(key => data[key] === null || (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0))
+    && typeof data.last_updated === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(data.last_updated)
+    && typeof data.expiration_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date);
+}
+
+function readCache(credentials) {
+  try {
+    const { files, path } = cacheLocation();
+    if (!files.fileExists(path)) return null;
+    const cache = JSON.parse(files.readString(path));
+    if (cache.profileId !== credentials.profileId || !(cache.data === null || isUsageData(cache.data))
+      || !Number.isFinite(cache.fetchedAt) || cache.fetchedAt < 0 || cache.fetchedAt > Date.now()
+      || !Number.isFinite(cache.retryAt) || cache.retryAt < 0) return null;
+    return cache;
+  } catch {
+    debugLog("Caché no disponible.");
+    return null;
+  }
+}
+
+function writeCache(credentials, cache) {
+  try {
+    const { files, path } = cacheLocation();
+    files.writeString(path, JSON.stringify({ profileId: credentials.profileId, ...cache }));
+  } catch {
+    debugLog("No se pudo guardar la lectura.");
+  }
+}
+
+function retryDeadline(headers) {
+  const key = Object.keys(headers).find(name => name.toLowerCase() === "retry-after");
+  const value = key ? String(headers[key]).trim() : "";
+  const deadline = /^\d+$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value);
+  return Number.isFinite(deadline) && deadline > Date.now() ? deadline : Date.now() + SETTINGS.retryMinutes * 60000;
+}
+
+async function requestText(url, stage, options = {}) {
+  const request = new Request(url);
+  request.method = options.method || "GET";
+  request.headers = { Accept: "application/json", ...options.headers };
+  request.timeoutInterval = options.timeoutSeconds || SETTINGS.requestTimeoutSeconds;
+  if (options.body !== undefined) request.body = options.body;
+  let text;
+  try {
+    text = await request.loadString();
+  } catch {
+    throw diagnosticError(`${stage}_network`);
+  }
+  const status = request.response ? request.response.statusCode : 0;
+  if (!Number.isInteger(status) || status < 200 || status >= 300) {
+    const error = diagnosticError(`${stage}_http_${status}`);
+    if (status === 429) error.retryAt = retryDeadline(request.response.headers || {});
+    throw error;
+  }
+  return text;
+}
+
+async function requestJson(url, stage, options = {}) {
+  const text = await requestText(url, stage, options);
+  try {
+    const data = JSON.parse(text);
+    if (data && typeof data === "object" && !Array.isArray(data)) return data;
+  } catch {
+    // Omit the raw response and native parser error.
+  }
+  throw diagnosticError(`${stage}_json`);
+}
+
+function formBody(values) {
+  return Object.keys(values).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(values[key])}`).join("&");
+}
+
+async function fetchUsage(credentials) {
+  debugLog("Inicio de sesión.");
+  const login = await requestJson("https://wbl.telcel-id.com:8443/login", "login", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: formBody({
+      username: credentials.phone,
+      "telcel-pass": credentials.password,
+      pB64: Data.fromString(credentials.password).toBase64String(),
+      CCode: "52",
+      sitedomain: "https://www.mitelcel.com",
+    }),
+  });
+  if (login.estatus !== "ok" || typeof login.token !== "string" || !login.token.trim()) throw diagnosticError("login_rejected");
+  try {
+    const tokens = await requestJson(`https://mi-telcel.smapps.mx/security/1.0.0/v2/token?user=${encodeURIComponent(credentials.phone)}&token=${encodeURIComponent(login.token)}`, "token", {
+      headers: {
+        Authorization: `Basic ${Data.fromBase64String(CLIENT_AUTH).toRawString()}`,
+        "app-version": "0.14", "code-version": "38", "device-id": "DSK",
+        os: "WEB", "os-version": "13", scope: "token:mit|token:b2f", "x-channel": "web-browser",
+      },
+    });
+    const entries = tokens.tokenResponse && tokens.tokenResponse.tokens;
+    const access = Array.isArray(entries) ? entries.find(entry => entry && entry.id === "token:b2f") : null;
+    if (tokens.message !== "Éxito." || !access || typeof access.access_token !== "string" || !access.access_token.trim()) throw diagnosticError("token_missing");
+    const response = await requestJson(`https://api.journeys.telcel.wavebybemobi.com/api/components/flow/home?externalCode=${encodeURIComponent(credentials.phone)}`, "usage", {
+      headers: { Authorization: `Bearer ${access.access_token}` },
+    });
+    return parseUsage(response);
+  } finally {
+    debugLog("Cierre de sesión SSO.");
+    try {
+      await requestText("https://dev.smapps.mx:9000/sso/revoke", "logout", {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formBody({ token: login.token, token_type: "revoke" }), timeoutSeconds: 5,
+      });
+    } catch {
+      debugLog("No se pudo completar el cierre de sesión.");
+    }
+  }
+}
+
+function parseUsage(response) {
+  function find(node, id) {
+    if (node && typeof node === "object") {
+      if (node.id === id) return node.config;
+      for (const value of Object.values(node)) {
+        const result = find(value, id);
+        if (result !== undefined) return result;
+      }
+    }
+    return undefined;
+  }
+  function component(id) {
+    const result = find(response, id);
+    if (!result || typeof result !== "object" || Array.isArray(result)) throw diagnosticError("usage_data");
+    return result;
+  }
+  function value(id) {
+    const result = component(id).value;
+    if (typeof result !== "string" && typeof result !== "number") throw diagnosticError("usage_data");
+    return String(result);
+  }
+  function number(id) {
+    const text = value(id);
+    const result = Number(text);
+    if (!text.trim() || !Number.isFinite(result) || result < 0) throw diagnosticError("usage_data");
+    return result;
+  }
+  function date(year, month, day) {
+    const result = new Date(Date.UTC(year, month - 1, day));
+    if (result.getUTCFullYear() !== year || result.getUTCMonth() !== month - 1 || result.getUTCDate() !== day) throw diagnosticError("usage_data");
+    return result;
+  }
+  const plan = value("tabs-plans-v2-plan-name-0-0-0");
+  const total = number("tabs-plans-v2-total-data-value-0-0-0");
+  const used = number("tabs-plans-v2-used-data-value-0-0-0");
+  const remaining = number("tabs-plans-v2-available-data-value-0-0-0");
+  const updated = value("last-update-text").replace("Información al ", "").replace(" h", "").trim();
+  const parts = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(updated);
+  if (!parts || Number(parts[4]) > 23 || Number(parts[5]) > 59) throw diagnosticError("usage_data");
+  const year = Number(parts[3]);
+  const readingDate = date(year, Number(parts[2]), Number(parts[1]));
+  const due = /^(\d{1,2}) de ([a-z]+)$/.exec(value("text-due-value").trim().toLowerCase());
+  const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  if (!due || !months.includes(due[2])) throw diagnosticError("usage_data");
+  let expiration = date(year, months.indexOf(due[2]) + 1, Number(due[1]));
+  if (expiration < readingDate) expiration = date(year + 1, months.indexOf(due[2]) + 1, Number(due[1]));
+  const segments = component("tabs-plans-v2-limited-cutoff-message-0-0-0").segments;
+  if (!Array.isArray(segments) || segments.some(s => !s || typeof s.text !== "string")) throw diagnosticError("usage_data");
+  const days = /Faltan\s+(\d+)/i.exec(segments.map(s => s.text).join(""));
+  if (!days) throw diagnosticError("usage_data");
+  const data = {
+    plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: Number(days[1]),
+    last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`,
+    total_gb: total, used_gb: used, remaining_gb: remaining,
+    used_percentage: total ? Math.round(used / total * 10000) / 100 : null,
+    remaining_percentage: total ? Math.round(remaining / total * 10000) / 100 : null,
+  };
+  if (!isUsageData(data)) throw diagnosticError("usage_data");
+  return data;
+}
+
+async function loadUsage(credentials) {
+  const now = Date.now();
+  const cache = readCache(credentials);
+  if (cache && cache.retryAt > now) {
+    debugLog("Actualización en pausa.");
+    return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
+  }
+  if (cache && cache.data && now - cache.fetchedAt < SETTINGS.cacheMinutes * 60000) {
+    debugLog("Usando lectura guardada.");
+    return { data: cache.data, updateFailed: false, refreshAt: cache.fetchedAt + SETTINGS.cacheMinutes * 60000 };
+  }
+  try {
+    const data = await fetchUsage(credentials);
+    const fetchedAt = Date.now();
+    writeCache(credentials, { data, fetchedAt, retryAt: 0 });
+    return { data, updateFailed: false, refreshAt: fetchedAt + SETTINGS.cacheMinutes * 60000 };
+  } catch (error) {
+    const data = cache ? cache.data : null;
+    const retryAt = error.retryAt || Date.now() + SETTINGS.retryMinutes * 60000;
+    writeCache(credentials, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt });
+    debugLog(`No se pudo actualizar: ${diagnosticError(error.code || "unknown").code}.`);
+    return { data, updateFailed: true, refreshAt: retryAt };
+  }
+}
+
+async function loadBackgroundImage() {
+  if (!SETTINGS.backgroundImageUrl.trim()) return null;
+  let files, imagePath, metadataPath, cached = null;
+  try {
+    files = FileManager.local();
+    imagePath = files.joinPath(files.libraryDirectory(), "mobile-data-telcel-background.png");
+    metadataPath = files.joinPath(files.libraryDirectory(), "mobile-data-telcel-background.json");
+    if (files.fileExists(metadataPath) && files.fileExists(imagePath)) {
+      const metadata = JSON.parse(files.readString(metadataPath));
+      if (metadata.url === SETTINGS.backgroundImageUrl) {
+        cached = files.readImage(imagePath);
+        const age = Date.now() - metadata.savedAt;
+        if (cached && Number.isFinite(age) && age >= 0 && age < SETTINGS.backgroundCacheHours * 3600000) return cached;
+      }
+    }
+  } catch {
+    // Missing or corrupt image cache: try the URL once.
+  }
+  try {
+    const request = new Request(SETTINGS.backgroundImageUrl);
+    request.timeoutInterval = SETTINGS.backgroundTimeoutSeconds;
+    const image = await request.loadImage();
+    const status = request.response.statusCode;
+    if (status < 200 || status >= 300 || !image || image.size.width <= 0 || image.size.height <= 0) throw new Error("Image unavailable.");
+    // Store a small square image to limit widget memory on later runs.
+    const cropped = drawBackground(image, 0);
+    try {
+      if (files) {
+        files.writeImage(imagePath, cropped);
+        files.writeString(metadataPath, JSON.stringify({ url: SETTINGS.backgroundImageUrl, savedAt: Date.now() }));
+      }
+    } catch {
+      // Still display the downloaded image if writing the cache fails.
+    }
+    return cropped;
+  } catch {
+    return cached;
+  }
+}
+
+function drawBackground(image, opacity = SETTINGS.backgroundOverlayOpacity) {
+  const edge = 400;
+  const context = new DrawContext();
+  context.size = new Size(edge, edge);
+  context.respectScreenScale = false;
+  context.opaque = true;
+  const scale = Math.max(edge / image.size.width, edge / image.size.height);
+  const width = image.size.width * scale;
+  const height = image.size.height * scale;
+  context.drawImageInRect(image, new Rect((edge - width) / 2, (edge - height) / 2, width, height));
+  context.setFillColor(new Color("000000", Math.max(0, Math.min(1, opacity))));
+  context.fillRect(new Rect(0, 0, edge, edge));
+  return context.getImage();
+}
+
+function formatGB(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value.toFixed(1)
+    : "—";
+}
+
+function clampPercentage(value) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : 0;
+}
+
+function formatReading(value) {
+  // Preserve the carrier's wall-clock reading: its timestamp has no timezone.
+  const [date, time] = value.split("T");
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year.slice(-2)} ${time.slice(0, 5)}`;
+}
+
+function formatExpiration(value) {
+  const [, month, day] = value.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${Number(day)} ${months[Number(month) - 1]}`;
+}
+
+function formatRunTime(date) {
+  const pad = value => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function addExecutionTime(widget) {
+  widget.addSpacer(3);
+  addText(widget, `Ejecutado · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
+}
+
+function drawProgressBar(percentage) {
+  const context = new DrawContext();
+  context.size = new Size(BAR_WIDTH, BAR_HEIGHT);
+  context.opaque = false;
+  context.respectScreenScale = true;
+
+  function roundedFill(width, color) {
+    if (width <= 0) return;
+    const radius = Math.min(BAR_HEIGHT / 2, width / 2);
+    const path = new Path();
+    path.addRoundedRect(new Rect(0, 0, width, BAR_HEIGHT), radius, radius);
+    context.setFillColor(new Color(color));
+    context.addPath(path);
+    context.fillPath();
+  }
+
+  roundedFill(BAR_WIDTH, COLORS.track);
+  // DrawContext has no native gradient fill; use the red accent directly.
+  roundedFill(BAR_WIDTH * clampPercentage(percentage) / 100, COLORS.accent);
+  return context.getImage();
+}
+
+function addText(stack, value, font, color) {
+  const text = stack.addText(value);
+  text.font = font;
+  text.textColor = new Color(color);
+  text.lineLimit = 1;
+  text.minimumScaleFactor = 0.7;
+  return text;
+}
+
+function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) {
+  const widget = new ListWidget();
+  // iOS decides the actual refresh time; this is only the earliest requested time.
+  if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
+  widget.backgroundColor = new Color(COLORS.background);
+  widget.setPadding(12, 12, 12, 12);
+  // iOS applies the outer widget corner shape.
+  const header = widget.addStack();
+  header.centerAlignContent();
+  const title = header.addStack();
+  title.size = new Size(96, 14);
+  addText(title, data && data.plan_name ? data.plan_name : "Consumo", Font.boldSystemFont(11), COLORS.text);
+  header.addSpacer();
+  addText(header, "Telcel", Font.boldSystemFont(8), COLORS.text);
+
+  if (!data) {
+    widget.addSpacer();
+    addText(widget, setupRequired ? "Configura Telcel" : "No se pudo cargar", Font.boldSystemFont(13), COLORS.text);
+    widget.addSpacer(5);
+    addText(widget, setupRequired ? "Abre Scriptable para configurar" : "Intenta más tarde", Font.systemFont(11), COLORS.muted);
+    widget.addSpacer();
+    addExecutionTime(widget);
+    return widget;
+  }
+
+  widget.addSpacer(3);
+  const reading = widget.addStack();
+  reading.bottomAlignContent();
+  addText(reading, formatGB(data.remaining_gb), Font.boldSystemFont(34), COLORS.text);
+  reading.addSpacer(4);
+  const unit = reading.addStack();
+  unit.layoutVertically();
+  addText(unit, "GB", Font.mediumSystemFont(14), COLORS.muted);
+  unit.addSpacer(7);
+  addText(widget, `disponibles de ${formatGB(data.total_gb)} GB`, Font.systemFont(10), COLORS.muted);
+
+  widget.addSpacer(3);
+  const progress = widget.addImage(drawProgressBar(data.used_percentage));
+  progress.imageSize = new Size(BAR_WIDTH, BAR_HEIGHT);
+  progress.leftAlignImage();
+  widget.addSpacer(3);
+  addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted);
+  widget.addSpacer();
+  if (data.expiration_date !== null) {
+    addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
+    widget.addSpacer(3);
+  }
+  addText(widget, `Actualizado · ${formatReading(data.last_updated)}`, Font.systemFont(8), COLORS.muted);
+  if (updateFailed) {
+    widget.addSpacer(3);
+    addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.accent);
+  }
+  addExecutionTime(widget);
+  return widget;
+}
+
+async function main() {
+  let result;
+  if (SETTINGS.useSampleData) {
+    result = {
+      data: ["error", "setup"].includes(SETTINGS.sampleState) ? null : SAMPLE_DATA,
+      updateFailed: SETTINGS.sampleState === "stale" || SETTINGS.sampleState === "error",
+      setupRequired: SETTINGS.sampleState === "setup",
+    };
+  } else {
+    const { credentials, cancelled } = await credentialsForRun();
+    if (cancelled) {
+      Script.complete();
+      return;
+    }
+    result = credentials ? await loadUsage(credentials) : { data: null, setupRequired: true };
+  }
+  const widget = createWidget(result);
+  if (result.data) {
+    const image = await loadBackgroundImage();
+    if (image) widget.backgroundImage = drawBackground(image);
+  }
+  Script.setWidget(widget);
+  if (!config.runsInWidget) await widget.presentSmall();
+  Script.complete();
+}
+
+await main();

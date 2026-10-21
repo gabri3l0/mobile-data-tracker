@@ -1,11 +1,16 @@
 # Mobile data widgets
 
 Show your remaining mobile data on your iPhone with Scriptable.
-These widgets provide a personal view of current account usage on the device.
-Today they need a running usage API; see the [central server guide](../server/README.md).
-Standalone access to the carrier from Scriptable is planned for a later change.
+The new [standalone Telcel widgets](telcel/README.md) call the carrier directly.
+Copy one script into Scriptable; no server or helper script is needed.
+
+The instructions below describe the existing `dark/` and `image/` versions, which
+still use the [central server](../server/README.md). They remain available during
+the transition to carrier folders.
 
 ## Contents
+
+- [Standalone Telcel](telcel/README.md): self-contained solid and image designs.
 
 - [Dark](dark/README.md): compact widget with a dark background.
 - [Image](image/README.md): widget with a configurable image background.
