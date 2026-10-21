@@ -1,11 +1,12 @@
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
-CarrierName = Literal["telcel"]
+CarrierName = Literal["telcel", "bait"]
+DataTier = Literal["high_speed", "throttled"]
 
 
 class UsageData(TypedDict):
-    """Carrier-independent usage; dates use ISO strings without timezone conversion."""
+    """Normalized usage; last_updated is carrier reading time, or fetch time if unavailable."""
 
     plan_name: str
     expiration_date: str
@@ -16,3 +17,4 @@ class UsageData(TypedDict):
     remaining_gb: float
     used_percentage: float | None
     remaining_percentage: float | None
+    data_tier: NotRequired[DataTier | None]

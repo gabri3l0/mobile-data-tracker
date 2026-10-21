@@ -1,0 +1,229 @@
+{
+  "success": true,
+  "data": [
+    {
+      "name": "FU_Data_Altan-RN_CT",
+      "category": "Data",
+      "type": "BestEffort",
+      "tethering": true,
+      "unlimited": true,
+      "resume": {
+        "total": 20495,
+        "unused": 13805,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 16384,
+          "unused": 9694,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        },
+        {
+          "offering_id": "1809906761",
+          "total": 4111,
+          "unused": 4111,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_ThrMBB_Altan-RN_128kbps_CT_P2",
+      "category": "Data",
+      "type": "Throttling",
+      "tethering": true,
+      "unlimited": true,
+      "resume": {
+        "total": 107520,
+        "unused": 107520,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 102400,
+          "unused": 102400,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        },
+        {
+          "offering_id": "1809906761",
+          "total": 5120,
+          "unused": 5120,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_Min_Altan",
+      "category": "Minutes",
+      "type": "National",
+      "tethering": false,
+      "unlimited": true,
+      "resume": {
+        "total": 43200,
+        "unused": 43019,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 43200,
+          "unused": 43019,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_SMS_Altan-NR-IR-LDI_NA",
+      "category": "Message",
+      "type": "International",
+      "tethering": false,
+      "unlimited": true,
+      "resume": {
+        "total": 500,
+        "unused": 500,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 500,
+          "unused": 500,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_SMS_Altan-NR-LDI_NA",
+      "category": "Message",
+      "type": "National",
+      "tethering": false,
+      "unlimited": true,
+      "resume": {
+        "total": 3000,
+        "unused": 3000,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 3000,
+          "unused": 3000,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_Min_Altan-NR-IR-LDI_NA",
+      "category": "Minutes",
+      "type": "International",
+      "tethering": false,
+      "unlimited": true,
+      "resume": {
+        "total": 750,
+        "unused": 750,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 750,
+          "unused": 750,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    },
+    {
+      "name": "FU_Min_Altan-NR-LDI_NA",
+      "category": "Minutes",
+      "type": "National",
+      "tethering": false,
+      "unlimited": true,
+      "resume": {
+        "total": 1500,
+        "unused": 1500,
+        "expire_date": "2026-11-10T00:00:00Z"
+      },
+      "offers_detail": [
+        {
+          "offering_id": "1809906761",
+          "total": 1500,
+          "unused": 1500,
+          "effective_date": "2026-10-10T06:00:00Z",
+          "expire_date": "2026-11-10T06:00:00Z",
+          "is_package": true,
+          "offer_name": "Paquete 3 meses Ilimitado",
+          "package_duration": 90,
+          "purchase_date": "2026-08-09T06:03:07Z",
+          "package_end_date": "2026-11-10T05:59:59Z",
+          "current_cycle": 3,
+          "total_cycles": 3
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@ Track mobile data usage with two components:
   longer-term purpose of tracking family accounts, daily consumption, history, and
   trends. Those account-management and analytics features are not implemented yet.
 
-The current integration supports one carrier API format.
+The central server supports Telcel and Bait.
 
 ## Preview
 
@@ -33,8 +33,7 @@ The current integration supports one carrier API format.
 - [Central server](server/README.md) — setup, CLI, API, authentication, and tests.
 - [iPhone widgets](widgets/README.md) — designs, Scriptable setup, and refresh behavior.
 
-Server setup and Python commands now run from `server/`. Existing users should move
-their local `.env` to `server/.env`; see the server guide for migration details.
+Run Python commands from `server/` and keep local configuration in `server/.env`.
 
 ## License
 

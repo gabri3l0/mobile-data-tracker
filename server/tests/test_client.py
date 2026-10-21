@@ -70,10 +70,37 @@ def test_client_creates_isolated_accounts_and_preserves_telcel_settings(monkeypa
     assert len({id(c) for c in configs}) == 3
 
 
-@pytest.mark.parametrize("carrier", ["bait", "unknown"])
+@pytest.mark.parametrize("carrier", ["unknown", ""])
 def test_client_rejects_unsupported_carriers_before_construction(monkeypatch, carrier):
     constructor = Mock()
     monkeypatch.setattr(client, "TelcelProvider", constructor)
     with pytest.raises(ValueError, match="Unsupported carrier"):
         MobileDataTracker(carrier)
     constructor.assert_not_called()
+
+
+def test_bait_selection_uses_server_key_and_isolates_phone_overrides(monkeypatch):
+    constructor = Mock()
+    telcel = Mock()
+    monkeypatch.setattr(client, "BaitProvider", constructor)
+    monkeypatch.setattr(client, "TelcelProvider", telcel)
+    monkeypatch.setenv("BAIT_PHONE", "5512345678")
+    monkeypatch.setenv("BAIT_SERVICE_KEY", "private-key")
+    MobileDataTracker("bait")
+    MobileDataTracker("bait", username="5587654321", password="unused")
+    MobileDataTracker("bait", username="5598765432")
+    configs = [call.args[0] for call in constructor.call_args_list]
+    assert [config.phone for config in configs] == ["5512345678", "5587654321", "5598765432"]
+    assert all(config.service_key == "private-key" for config in configs)
+    assert len({id(config) for config in configs}) == 3
+    telcel.assert_not_called()
+
+
+def test_bait_client_delegates_usage_and_closes_provider(monkeypatch):
+    provider = Mock(spec=["get_usage_data", "close"])
+    provider.get_usage_data.return_value = {"remaining_gb": 105.0, "data_tier": "throttled"}
+    monkeypatch.setattr(client, "BaitProvider", Mock(return_value=provider))
+    tracker = MobileDataTracker("bait", username="5512345678")
+    assert tracker.get_usage_data()["data_tier"] == "throttled"
+    tracker.close()
+    provider.close.assert_called_once_with()
