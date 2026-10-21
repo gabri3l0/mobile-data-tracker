@@ -1,108 +1,37 @@
-# Mobile data widgets
+# Widgets para iPhone
 
-Show your remaining mobile data on your iPhone with Scriptable.
-The new standalone [Telcel](telcel/README.md) and [Bait](bait/README.md) widgets
-call each carrier directly.
-Copy one script into Scriptable; no server or helper script is needed.
+Consulta tu consumo directamente con el operador. Cada diseño es un solo archivo
+para copiar en Scriptable, sin servidor, computadora ni scripts adicionales.
 
-The instructions below describe the existing `dark/` and `image/` versions, which
-still use the [central server](../server/README.md). They remain available during
-the transition to carrier folders.
+| Operador | Color sólido | Imagen de fondo | Instalación |
+| --- | --- | --- | --- |
+| Telcel | [solid.js](telcel/solid.js) | [image.js](telcel/image.js) | [Guía Telcel](telcel/README.md) |
+| Bait | [solid.js](bait/solid.js) | [image.js](bait/image.js) | [Guía Bait](bait/README.md) |
 
-## Contents
+Tus datos se guardan en Keychain. Telcel pide número y contraseña; Bait solo pide
+el número. Los dos diseños de cada operador comparten la misma cuenta.
 
-- [Standalone Telcel](telcel/README.md): self-contained solid and image designs.
-- [Standalone Bait](bait/README.md): phone-only setup, high-speed and throttled data.
+## Personalizar
 
-- [Dark](dark/README.md): compact widget with a dark background.
-- [Image](image/README.md): widget with a configurable image background.
-- [Shared helper](shared/README.md): usage requests, validation, caching, and retries.
-- [Screenshots](screenshots/README.md): preview images used in the project README.
+Cambia `backgroundHex` para el color. En el diseño con imagen, ajusta
+`backgroundImageUrl` y `backgroundOverlayOpacity`.
 
-## Preview on your computer
+Prueba colores y fondos en las vistas de [color sólido](previews/solid.html) e
+[imagen](previews/image.html). Abre el HTML en tu navegador y elige operador y
+estado. Solo usan datos de ejemplo; la imagen puede requerir internet. Copia los
+valores elegidos en `SETTINGS` de tu script: el HTML no modifica los archivos.
 
-Double-click [dark/preview.html](dark/preview.html). It uses sample data and makes no API calls.
+También puedes usar `useSampleData: true` para probar en Scriptable. En Bait,
+`sampleState: "throttled"` muestra el balance de velocidad reducida.
 
-For an image background, open [image/preview.html](image/preview.html).
-It uses sample usage data and downloads the background image from the configured URL.
+## Actualización
 
-## Image-background design
+La lectura se guarda 30 minutos. Si falla una consulta, se conserva la anterior y
+se reintenta después de 15 minutos, o cuando indique el operador si limita las
+consultas. iOS decide cuándo refrescar el widget.
 
-Use [image/mobile-data-widget.js](image/mobile-data-widget.js) in a Scriptable script
-named **Mobile Data Image**, alongside the same **usage-data** helper.
-Follow the setup below, choosing **Mobile Data Image** instead of **Mobile Data Dark**.
+Para cambiar tu cuenta, ejecuta el script y elige **Cambiar datos**.
 
-Change `BACKGROUND_IMAGE_URL` near the top of the widget or HTML preview to use
-another image. `BACKGROUND_OVERLAY_OPACITY` controls the dark overlay (default `0.75`).
-Edit each file separately when changing the preview and iPhone background.
-Images are cropped to fill the card and cached on the iPhone for 24 hours. If loading
-fails, the last image for that URL is reused, or the background stays dark.
-Usage caching and server retries work the same for both designs.
-Sample mode skips the usage API; the image may still need internet on its first load.
+## Pruebas
 
-## Set up in Scriptable
-
-1. Install Scriptable on your iPhone.
-2. Create a script named **usage-data**. Paste [shared/usage-data.js](shared/usage-data.js) into it.
-3. Create a script named **Mobile Data Dark**. Paste [dark/mobile-data-widget.js](dark/mobile-data-widget.js) into it.
-4. In **Mobile Data Dark**, fill in `SETTINGS`: usage URL, health URL, API key, phone number, and password.
-5. Run **Mobile Data Dark** to preview it.
-
-No folders are needed. The dark widget loads **usage-data** automatically.
-Keep your credentials private. Set `USE_SAMPLE_DATA = true` to preview without the API;
-leave it `false` for real data.
-
-## Add to your home screen
-
-1. Long-press the home screen → **Edit → Add Widget** (or **+**).
-2. Add the small **Scriptable** widget.
-3. Long-press it → **Edit Widget**.
-4. Choose **Mobile Data Dark**, leave **Parameter** empty, and set **When Interacting** to **Run Script**.
-
-Leave **Always Run in App** off and **URL Scheme** unchanged in the script settings.
-
-## What happens when it runs?
-
-- **Saved data is under 30 minutes old:** show it. No server calls.
-- **Saved data is 30 minutes old or missing:** check the server, then request usage if ready.
-- **Server is unavailable:** keep saved data and show **Iniciando conexión / Reintenta en 2 min**.
-- **Usage request fails:** keep saved data and show **No se pudo actualizar**.
-- **No saved data:** show the connection message or **No se pudo cargar**.
-
-Running repeatedly does not reset the saved data's age.
-
-## When does it retry?
-
-| Result | Next attempt |
-| --- | --- |
-| Success | After 30 minutes |
-| Server unavailable | After 2 minutes |
-| Usage request failed | After 15 minutes |
-| Rate limited | After the API's `Retry-After` deadline |
-
-Running before a retry deadline makes no server calls.
-The script finishes after each run; it does not keep waiting or looping.
-It asks iOS to refresh later, but iOS controls the actual timing. You can also run it manually.
-
-## Dates on the card
-
-- **Actualizado:** when the carrier measured usage.
-- **Ejecutado:** when the script last ran, including cached results and failures.
-
-New data updates the card automatically. Code changes must be copied into Scriptable manually.
-
-## Troubleshooting
-
-Set `debug: true` inside the widget's `SETTINGS`, then run the design script from
-the Scriptable editor. Open the console to read messages starting with `[Usage]`.
-Update **usage-data** in Scriptable too when copying a newer version of the code.
-
-- **Using fresh cache:** no request was needed.
-- **Retry paused until…:** wait for that deadline before trying again. Times ending in `Z` are UTC.
-- **health_network / health_response:** the health check failed or returned an unexpected response.
-- **usage_http_401:** the API rejected the bearer key.
-- **usage_http_429:** the usage limit was reached.
-- **usage_network:** the usage request failed or timed out.
-- **usage_json / usage_data:** the response was not valid JSON or did not contain the expected fields.
-
-Logs omit URLs, credentials, and response bodies. Set `debug: false` to disable them.
+Desde la raíz del repositorio: `node --test widgets/tests/*.test.cjs`.

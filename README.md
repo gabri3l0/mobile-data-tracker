@@ -13,16 +13,19 @@ The central server supports Telcel and Bait.
 
 ## Preview
 
-| Dark | Image 1 | Image 2 |
+Choose Telcel or Bait in either preview to try colors, backgrounds, and sample states.
+
+| Solid | Image 1 | Image 2 |
 | :---: | :---: | :---: |
-| [<img src="widgets/screenshots/dark.jpg" alt="Dark widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/dark/preview.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Image 1 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Image 2 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) |
-| [Open Dark preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/dark/preview.html) | [Open Image 1 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) | [Open Image 2 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/image/preview.html) |
+| [<img src="widgets/screenshots/dark.jpg" alt="Solid widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [<img src="widgets/screenshots/image-retro.jpg" alt="Image 1 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [<img src="widgets/screenshots/image-landscape.jpg" alt="Image 2 widget" width="240">](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
+| [Open Solid preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/solid.html) | [Open Image 1 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) | [Open Image 2 preview](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/image.html) |
 
 ## Features
 
 - Remaining and used data, with a usage progress bar.
 - Plan name, expiration date, and days remaining.
-- Dark and customizable image-background widgets.
+- Solid hex-color and customizable image-background widgets.
+- One self-contained script per carrier and design, with Keychain setup.
 - Cached readings available when updates fail.
 - Separate timestamps for usage readings and script execution.
 - Bearer-protected API with limits per person.
@@ -45,4 +48,4 @@ Third-party images and assets retain their respective licenses.
 
 This project is unofficial and is not affiliated with, endorsed by, or sponsored by the carrier.
 Use only accounts you own or are authorized to access, and comply with applicable laws and carrier terms.
-No credentials, tokens, or proprietary carrier software are distributed with this project.
+Personal account credentials, session tokens, and proprietary carrier software are not distributed with this project.

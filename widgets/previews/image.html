@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Imagen de fondo · Vista previa</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #242428; background: #f6f4f2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 48px 24px; }
+    main { max-width: 760px; margin: auto; }
+    .eyebrow { color: #8b5551; font-size: 11px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.04em; margin: 12px 0; font-weight: 650; }
+    .intro, .note { color: #747177; font-size: 13px; line-height: 1.6; }
+    button { border: 0; border-radius: 8px; padding: 9px 12px; background: transparent; color: #6c676c; font: inherit; font-size: 12px; cursor: pointer; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #d94137; outline-offset: 3px; }
+    .zoom { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #747177; }
+    input { width: 80px; accent-color: #d94137; }
+    .stage { min-height: 470px; display: grid; place-items: center; border: 1px solid #e7e0dc; border-radius: 24px; background: radial-gradient(ellipse at 48% 55%, #ead7d0 0, #eee5df 38%, #f1ece7 80%); padding: 24px; overflow: auto; }
+    .frame { width: 340px; height: 340px; flex-shrink: 0; }
+    .card { width: 170px; height: 170px; padding: 12px; border-radius: 22px; background: #101012; color: white; display: flex; flex-direction: column; transform: scale(2); transform-origin: top left; box-shadow: 0 12px 24px #2d1e1920; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .header { display: flex; gap: 6px; align-items: center; justify-content: space-between; height: 14px; flex-shrink: 0; }
+    .title { max-width: 96px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: -.3px; }
+    .badge { flex-shrink: 0; font-size: 8px; font-weight: 700; color: var(--accent, #ff453a); }
+    .usage { margin-top: 3px; }
+    .reading { display: flex; gap: 4px; align-items: baseline; height: 38px; }
+    .value { font-size: 34px; line-height: 38px; letter-spacing: -1.4px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .unit { font-size: 14px; font-weight: 500; color: #929298; }
+    .available { font-size: 10px; line-height: 12px; color: #929298; }
+    .track { width: 112px; height: 7px; border-radius: 4px; overflow: hidden; background: #2c2c30; margin-top: 3px; }
+    .fill { height: 100%; background: var(--accent, #ff453a); border-radius: inherit; }
+    .percentage { margin-top: 3px; font-size: 9px; line-height: 11px; color: #929298; }
+    .footer { margin-top: auto; color: #929298; }
+    .expiration { font-size: 9px; line-height: 11px; }
+    .timestamp { font-size: 8px; line-height: 10px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .execution { flex-shrink: 0; font-size: 7px; line-height: 9px; margin-top: 3px; color: #929298; font-variant-numeric: tabular-nums; }
+    .warning { color: var(--accent, #ff453a); font-size: 8px; line-height: 10px; margin-top: 3px; white-space: pre-line; }
+    .empty { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+    .empty strong { font-size: 13px; }
+    .empty span { font-size: 11px; color: #929298; }
+    [hidden] { display: none !important; }
+    .note { margin: 16px 0 0; }
+    @media (max-width: 420px) { body { padding: 28px 14px; } .stage { padding: 16px; min-height: 400px; } }
+    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 24px 0 16px; }
+    label { display: grid; gap: 7px; font-size: 12px; color: #5e5a59; }
+    select, input[type="text"], input[type="url"], textarea { width: 100%; min-width: 0; border: 1px solid #d9d3cf; border-radius: 9px; padding: 10px 12px; background: white; color: #242428; font: inherit; font-size: 13px; }
+    select { min-height: 39px; }
+    .color-control { display: flex; align-items: center; gap: 8px; }
+    input[type="color"] { flex: 0 0 42px; width: 42px; height: 39px; padding: 3px; border: 1px solid #d9d3cf; border-radius: 8px; background: white; cursor: pointer; }
+    input[type="range"] { width: 100%; }
+    .image-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+    .image-controls button { background: #242428; color: white; min-height: 39px; }
+    .image-options { margin-bottom: 20px; }
+    .image-options > label { margin-top: 12px; }
+    .image-options input[type="range"] { max-width: 260px; }
+    .status { margin: 6px 0 0; min-height: 16px; font-size: 12px; color: #747177; }
+    .validation { color: #a52c23; }
+    [aria-invalid="true"] { border-color: #a52c23 !important; }
+    .zoom { max-width: 220px; margin: 18px 0 0 auto; }
+    .settings { margin-top: 24px; }
+    textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.6; }
+    nav { display: flex; gap: 18px; margin-bottom: 24px; font-size: 13px; }
+    a { color: #6c4642; text-underline-offset: 3px; }
+    .available { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card { position: relative; isolation: isolate; overflow: hidden; }
+    .background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: -2; }
+    .has-background::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--overlay-opacity, .65)); z-index: -1; pointer-events: none; }
+    .image-design .badge, .image-design .unit, .image-design .available, .image-design .percentage, .image-design .footer, .image-design .execution, .image-design .empty span { color: #fff; }
+  </style>
+</head>
+<body data-design="image" class="image-design">
+  <main>
+    <nav aria-label="Diseños"><a href="solid.html">Color sólido</a><a href="image.html">Imagen de fondo</a></nav>
+    <div class="eyebrow">Widgets / Vista previa</div>
+    <h1>Imagen de fondo</h1>
+    <p class="intro">Widget pequeño · Datos de ejemplo · Sin consultas a tu cuenta</p>
+    <div class="controls">
+      <label>Operador<select id="carrier"><option value="telcel">Telcel</option><option value="bait">Bait</option></select></label>
+      <label>Estado<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+      <label>Color de fondo<span class="color-control"><input id="color-picker" type="color" value="#101012" aria-label="Selector de color"><input id="hex" type="text" value="101012" maxlength="7" spellcheck="false" aria-label="Color hexadecimal" aria-describedby="color-error"></span></label>
+    </div>
+    <p class="status validation" id="color-error" role="status" hidden>Usa seis dígitos hexadecimales, por ejemplo 101012.</p>
+    <section class="image-options" id="image-settings" aria-label="Fondo de imagen" hidden>
+      <div class="image-controls"><label>URL de la imagen<input id="image-url" type="url" value="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdZaVghFotA_TTTq7zfOxO5AipAmIdJpEJaQ0j4WnVb0BQfW67EaoZPcXC&amp;s=10" placeholder="https://..." aria-describedby="image-status"></label><button id="apply-image" type="button">Aplicar imagen</button></div>
+      <p class="status" id="image-status" role="status"></p>
+      <label>Oscurecimiento <output id="opacity-value" for="opacity">0.65</output><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.65"></label>
+    </section>
+    <div class="stage">
+      <div class="frame" id="frame">
+        <article class="card" id="card" aria-label="Vista previa del consumo de datos">
+          <img class="background" id="background" alt="" referrerpolicy="no-referrer" hidden>
+          <header class="header"><span class="title" id="plan">Consumo</span><span class="badge" id="carrier-badge">Telcel</span></header>
+          <section class="usage" id="usage">
+            <div class="reading"><span class="value" id="remaining"></span><span class="unit">GB</span></div>
+            <div class="available" id="available"></div>
+            <div class="track" role="progressbar" aria-label="Datos utilizados" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="fill" id="fill"></div></div>
+            <div class="percentage" id="percentage"></div>
+          </section>
+          <footer class="footer" id="footer"><div class="expiration" id="expiration"></div><div class="timestamp" id="timestamp"></div><div class="warning" id="warning" hidden>No se pudo actualizar</div></footer>
+          <section class="empty" id="empty" hidden><strong id="empty-title">No se pudo cargar</strong><span id="empty-detail">Intenta más tarde</span></section>
+          <div class="execution" id="execution"></div>
+        </article>
+      </div>
+    </div>
+    <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
+    <label class="settings">Copia estos valores en SETTINGS de tu script<textarea id="settings" rows="4" readonly spellcheck="false"></textarea></label>
+    <p class="note">Los controles no modifican tus archivos JavaScript. La vista aproxima el diseño de iOS; confirma el resultado en Scriptable. La imagen se descarga desde la URL elegida.</p>
+  </main>
+  <script>
+const IMAGE_DESIGN = document.body.dataset.design === "image";
+const $ = id => document.getElementById(id);
+const RUN_AT = new Date();
+const SAMPLES = {
+  telcel: {
+    plan_name: "Plan 7 GB", expiration_date: "2026-10-24", days_until: 5,
+    last_updated: "2026-10-18T01:30:00", total_gb: 7, used_gb: 5.4, remaining_gb: 1.6,
+    used_percentage: 77.14, remaining_percentage: 22.86,
+  },
+  bait: {
+    plan_name: "Paquete 3 meses Ilimitado", expiration_date: "2026-11-10", days_until: 21,
+    last_updated: "2026-10-20T21:38:00.000Z", total_gb: 20495 / 1024,
+    used_gb: 6690 / 1024, remaining_gb: 13805 / 1024,
+    used_percentage: 32.64, remaining_percentage: 67.36, data_tier: "high_speed",
+  },
+};
+let backgroundReady = false;
+let appliedImageUrl = "";
+let appliedHex = "101012";
+
+function formatRunTime(value) {
+  const pad = number => String(number).padStart(2, "0");
+  return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${String(value.getFullYear()).slice(-2)} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+function updateSettings() {
+  let value = `backgroundHex: "${appliedHex}",`;
+  if (IMAGE_DESIGN) value += `\nbackgroundImageUrl: ${JSON.stringify(appliedImageUrl)},\nbackgroundOverlayOpacity: ${Number($("opacity").value)},`;
+  $("settings").value = value;
+}
+
+function applyHex(value) {
+  const hex = value.trim().replace(/^#/, "");
+  const valid = /^[0-9a-f]{6}$/i.test(hex);
+  $("hex").setAttribute("aria-invalid", String(!valid));
+  $("color-error").hidden = valid;
+  if (!valid) return;
+  appliedHex = hex.toUpperCase();
+  $("hex").value = appliedHex;
+  $("color-picker").value = `#${appliedHex}`;
+  $("card").style.backgroundColor = `#${appliedHex}`;
+  updateSettings();
+}
+
+function updateBackgroundVisibility() {
+  const show = IMAGE_DESIGN && backgroundReady && !["error", "setup"].includes($("state").value);
+  $("background").hidden = !show;
+  $("card").classList.toggle("has-background", show);
+}
+
+function applyImage() {
+  const value = $("image-url").value.trim();
+  if (value) {
+    try {
+      const url = new URL(value);
+      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+    } catch {
+      $("image-status").textContent = "Usa una URL que empiece con https:// o http://.";
+      $("image-url").setAttribute("aria-invalid", "true");
+      return;
+    }
+  }
+  $("image-url").setAttribute("aria-invalid", "false");
+  appliedImageUrl = value;
+  backgroundReady = false;
+  updateBackgroundVisibility();
+  updateSettings();
+  if (!value) {
+    $("background").removeAttribute("src");
+    $("image-status").textContent = "Sin imagen: se usa el color sólido.";
+    return;
+  }
+  $("image-status").textContent = "Cargando imagen…";
+  $("background").onload = () => {
+    backgroundReady = true;
+    $("image-status").textContent = "Imagen lista.";
+    updateBackgroundVisibility();
+  };
+  $("background").onerror = () => {
+    backgroundReady = false;
+    $("image-status").textContent = "No se pudo cargar la imagen; se usa el color sólido.";
+    updateBackgroundVisibility();
+  };
+  $("background").src = value;
+}
+
+function render() {
+  const carrier = $("carrier").value;
+  const isBait = carrier === "bait";
+  $("throttled-option").disabled = !isBait;
+  if (!isBait && $("state").value === "throttled") $("state").value = "success";
+  const state = $("state").value;
+  const data = state === "throttled" ? {
+    ...SAMPLES.bait, total_gb: 105, used_gb: 0, remaining_gb: 105,
+    used_percentage: 0, remaining_percentage: 100, data_tier: "throttled",
+  } : SAMPLES[carrier];
+  const name = isBait ? "Bait" : "Telcel";
+  const empty = ["error", "setup"].includes(state);
+  $("card").style.setProperty("--accent", isBait ? "#ffc700" : "#ff453a");
+  $("carrier-badge").textContent = name;
+  $("plan").textContent = empty ? "Consumo" : data.plan_name;
+  $("usage").hidden = empty;
+  $("footer").hidden = empty;
+  $("empty").hidden = !empty;
+  $("empty-title").textContent = state === "setup" ? `Configura ${name}` : "No se pudo cargar";
+  $("empty-detail").textContent = state === "setup" ? "Abre Scriptable para configurar" : "Intenta más tarde";
+  $("execution").textContent = `Ejecutado · ${formatRunTime(RUN_AT)}`;
+  updateBackgroundVisibility();
+  if (empty) return;
+  $("remaining").textContent = data.remaining_gb.toFixed(1);
+  $("available").textContent = data.data_tier === "throttled"
+    ? `Velocidad reducida · ${data.total_gb.toFixed(1)} GB` : `disponibles de ${data.total_gb.toFixed(1)} GB`;
+  const used = Math.min(100, Math.max(0, data.used_percentage || 0));
+  $("fill").style.width = `${used}%`;
+  $("progress").setAttribute("aria-valuenow", String(used));
+  $("percentage").textContent = `${Math.round(used)}% utilizado`;
+  const [, month, day] = data.expiration_date.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
+  if (isBait) {
+    $("timestamp").textContent = `Consultado · ${formatRunTime(new Date(data.last_updated))}`;
+  } else {
+    const [date, time] = data.last_updated.split("T");
+    const [year, readingMonth, readingDay] = date.split("-");
+    $("timestamp").textContent = `Actualizado · ${readingDay}/${readingMonth}/${year.slice(-2)} ${time.slice(0, 5)}`;
+  }
+  $("warning").hidden = state !== "stale";
+}
+
+function setZoom(value) {
+  $("card").style.transform = `scale(${value})`;
+  $("frame").style.width = `${170 * value}px`;
+  $("frame").style.height = `${170 * value}px`;
+  $("scale").textContent = `${value}×`;
+  $("zoom").value = String(value);
+}
+
+$("carrier").addEventListener("change", render);
+$("state").addEventListener("change", render);
+$("hex").addEventListener("input", event => applyHex(event.target.value));
+$("color-picker").addEventListener("input", event => applyHex(event.target.value));
+$("zoom").addEventListener("input", event => setZoom(Number(event.target.value)));
+$("image-settings").hidden = !IMAGE_DESIGN;
+if (IMAGE_DESIGN) {
+  $("apply-image").addEventListener("click", applyImage);
+  $("opacity").addEventListener("input", () => {
+    $("card").style.setProperty("--overlay-opacity", $("opacity").value);
+    $("opacity-value").textContent = $("opacity").value;
+    updateSettings();
+  });
+}
+const params = new URLSearchParams(window.location.search);
+if (["telcel", "bait"].includes(params.get("carrier"))) $("carrier").value = params.get("carrier");
+if (["success", "stale", "error", "setup", "throttled"].includes(params.get("state"))) $("state").value = params.get("state");
+applyHex(params.get("hex") || $("hex").value);
+if (IMAGE_DESIGN) {
+  if (params.has("image")) $("image-url").value = params.get("image");
+  const opacity = params.get("overlay");
+  if (opacity !== null && opacity.trim() && Number.isFinite(Number(opacity))) $("opacity").value = String(Math.max(0, Math.min(1, Number(opacity))));
+  $("card").style.setProperty("--overlay-opacity", $("opacity").value);
+  $("opacity-value").textContent = $("opacity").value;
+  applyImage();
+}
+updateSettings();
+setZoom(window.innerWidth < 420 ? 1.5 : 2);
+render();
+  </script>
+</body>
+</html>
