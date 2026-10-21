@@ -2,12 +2,14 @@
 // icon-color: yellow; icon-glyph: signal;
 
 const RUN_AT = new Date();
+// Customize the settings below. Guide: widgets/README.md#customize
+// Enter account details when running the script; they are saved in Keychain.
 const SETTINGS = {
-  backgroundHex: "101012", // Six hex digits, without #.
+  backgroundHex: "101012", // Replace with your six-digit hex color, without #.
   cacheMinutes: 30,
   retryMinutes: 15,
   requestTimeoutSeconds: 20,
-  debug: false,
+  debug: false, // Safe request, cache, and failure logs in Scriptable.
   useSampleData: false,
   sampleState: "success", // success, stale, error, setup, throttled.
 };
@@ -143,6 +145,7 @@ function writeCache(credentials, cache) {
   try {
     const { files, path } = cacheLocation();
     files.writeString(path, JSON.stringify({ profileId: credentials.profileId, ...cache }));
+    debugLog("Caché guardada.");
   } catch {
     debugLog("No se pudo guardar la lectura.");
   }
@@ -161,16 +164,25 @@ async function requestText(url, stage, options = {}) {
   request.headers = { Accept: "application/json", ...options.headers };
   request.timeoutInterval = options.timeoutSeconds || SETTINGS.requestTimeoutSeconds;
   if (options.body !== undefined) request.body = options.body;
+  const label = ["login", "token", "usage", "logout"].includes(stage) ? stage : "request";
+  const startedAt = Date.now();
+  debugLog(`Solicitud ${label}: iniciada.`);
   let text;
   try {
     text = await request.loadString();
   } catch {
+    debugLog(`Solicitud ${label}: fallo de red o tiempo agotado.`);
     throw diagnosticError(`${stage}_network`);
   }
   const status = request.response ? request.response.statusCode : 0;
+  const safeStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : "desconocido";
+  debugLog(`Solicitud ${label}: HTTP ${safeStatus} (${Date.now() - startedAt} ms).`);
   if (!Number.isInteger(status) || status < 200 || status >= 300) {
     const error = diagnosticError(`${stage}_http_${status}`);
-    if (status === 429) error.retryAt = retryDeadline(request.response.headers || {});
+    if (status === 429) {
+      error.retryAt = retryDeadline(request.response.headers || {});
+      debugLog(`Límite del operador: esperar ${Math.ceil((error.retryAt - Date.now()) / 60000)} min.`);
+    }
     throw error;
   }
   return text;
@@ -184,6 +196,7 @@ async function requestJson(url, stage, options = {}) {
   } catch {
     // Omit the raw response and native parser error.
   }
+  debugLog(`Respuesta no válida: ${diagnosticError(`${stage}_json`).code}.`);
   throw diagnosticError(`${stage}_json`);
 }
 
@@ -257,15 +270,17 @@ async function loadUsage(credentials) {
   const now = Date.now();
   const cache = readCache(credentials);
   if (cache && cache.retryAt > now) {
-    debugLog("Actualización en pausa.");
+    debugLog(`Actualización en pausa: faltan ${Math.ceil((cache.retryAt - now) / 60000)} min.`);
     return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
   }
   if (cache && cache.data && now - cache.fetchedAt < SETTINGS.cacheMinutes * 60000) {
-    debugLog("Usando lectura guardada.");
+    debugLog(`Usando lectura guardada: ${Math.floor((now - cache.fetchedAt) / 60000)} min de antigüedad.`);
     return { data: cache.data, updateFailed: false, refreshAt: cache.fetchedAt + SETTINGS.cacheMinutes * 60000 };
   }
+  debugLog(cache && cache.data ? "Lectura vencida: consultar operador." : "Sin lectura guardada: consultar operador.");
   try {
     const data = await fetchUsage(credentials);
+    debugLog("Lectura recibida y validada.");
     const fetchedAt = Date.now();
     writeCache(credentials, { data, fetchedAt, retryAt: 0 });
     return { data, updateFailed: false, refreshAt: fetchedAt + SETTINGS.cacheMinutes * 60000 };
@@ -274,6 +289,8 @@ async function loadUsage(credentials) {
     const retryAt = error.retryAt || Date.now() + SETTINGS.retryMinutes * 60000;
     writeCache(credentials, { data, fetchedAt: cache ? cache.fetchedAt : 0, retryAt });
     debugLog(`No se pudo actualizar: ${diagnosticError(error.code || "unknown").code}.`);
+    debugLog(data ? "Mostrando lectura anterior." : "Sin lectura disponible.");
+    debugLog(`Próximo intento permitido en ${Math.ceil((retryAt - Date.now()) / 60000)} min.`);
     return { data, updateFailed: true, refreshAt: retryAt };
   }
 }
@@ -393,8 +410,10 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
 }
 
 async function main() {
+  debugLog("Ejecución iniciada.");
   let result;
   if (SETTINGS.useSampleData) {
+    debugLog("Modo de ejemplo: sin consultas al operador.");
     result = {
       data: ["error", "setup"].includes(SETTINGS.sampleState) ? null
         : SETTINGS.sampleState === "throttled" ? {
@@ -407,14 +426,17 @@ async function main() {
   } else {
     const { credentials, cancelled } = await credentialsForRun();
     if (cancelled) {
+      debugLog("Ejecución cancelada.");
       Script.complete();
       return;
     }
+    if (!credentials) debugLog("Configuración de cuenta pendiente.");
     result = credentials ? await loadUsage(credentials) : { data: null, setupRequired: true };
   }
   const widget = createWidget(result);
   Script.setWidget(widget);
   if (!config.runsInWidget) await widget.presentSmall();
+  debugLog("Widget mostrado. Ejecución finalizada.");
   Script.complete();
 }
 
