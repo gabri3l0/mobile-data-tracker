@@ -11,6 +11,11 @@ const SETTINGS = {
   backgroundOverlayOpacity: 0.65, // 0 = no dark overlay; 1 = fully black.
   backgroundCacheHours: 24,
   backgroundTimeoutSeconds: 5,
+  textPrimaryHex: "FFFFFF", // Main balance and plan name.
+  textSecondaryHex: "929298", // Details, units, and chart track (25% opacity).
+  accentHex: "FFC700", // Chart fill and carrier label.
+  chartStyle: "bar", // bar, arc (semicircle), or none.
+  showPlanName: true, // false shows only the carrier in the header.
   cacheMinutes: 30,
   retryMinutes: 15,
   requestTimeoutSeconds: 20,
@@ -19,12 +24,17 @@ const SETTINGS = {
   sampleState: "success", // success, stale, error, setup, throttled.
 };
 const CLIENT_AUTH = "NTdiZmIyNjczNWFhNGVjM2ExYmFhZmE4NjQwMDZkN2Q=";
+const CARRIER_NAME = "Bait";
 const COLORS = {
-  background: SETTINGS.backgroundHex,
-  text: "FFFFFF",
-  muted: "FFFFFF",
-  accent: "FFC700",
-  track: "2C2C30",
+  get background() { return appearanceHex(SETTINGS.backgroundHex, "101012"); },
+  get text() { return appearanceHex(SETTINGS.textPrimaryHex, "FFFFFF"); },
+  get muted() { return appearanceHex(SETTINGS.textSecondaryHex, "929298"); },
+  get accent() { return appearanceHex(SETTINGS.accentHex, "FFC700"); },
+  get warning() {
+    const hex = COLORS.background;
+    const brightness = (parseInt(hex.slice(0, 2), 16) * 299 + parseInt(hex.slice(2, 4), 16) * 587 + parseInt(hex.slice(4, 6), 16) * 114) / 1000;
+    return brightness > 140 ? "9A3412" : "FFB454";
+  },
 };
 const BAR_WIDTH = 112;
 const BAR_HEIGHT = 7;
@@ -384,9 +394,18 @@ function formatRunTime(date) {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function appearanceHex(value, fallback) {
+  return typeof value === "string" && /^#?[0-9a-f]{6}$/i.test(value.trim())
+    ? value.trim().replace(/^#/, "").toUpperCase() : fallback;
+}
+
+function chartStyle() {
+  return ["bar", "arc", "none"].includes(SETTINGS.chartStyle) ? SETTINGS.chartStyle : "bar";
+}
+
 function addExecutionTime(widget) {
-  widget.addSpacer(3);
-  addText(widget, `Última ejecución · ${formatRunTime(RUN_AT)}`, Font.systemFont(7), COLORS.muted);
+  widget.addSpacer(4);
+  addText(widget, `Última ejecución · ${formatRunTime(RUN_AT)}`, Font.systemFont(8), COLORS.muted);
 }
 
 function drawProgressBar(percentage) {
@@ -394,20 +413,46 @@ function drawProgressBar(percentage) {
   context.size = new Size(BAR_WIDTH, BAR_HEIGHT);
   context.opaque = false;
   context.respectScreenScale = true;
-
   function roundedFill(width, color) {
     if (width <= 0) return;
     const radius = Math.min(BAR_HEIGHT / 2, width / 2);
     const path = new Path();
     path.addRoundedRect(new Rect(0, 0, width, BAR_HEIGHT), radius, radius);
-    context.setFillColor(new Color(color));
+    context.setFillColor(color);
     context.addPath(path);
     context.fillPath();
   }
+  roundedFill(BAR_WIDTH, new Color(COLORS.muted, 0.25));
+  roundedFill(BAR_WIDTH * clampPercentage(percentage) / 100, new Color(COLORS.accent));
+  return context.getImage();
+}
 
-  roundedFill(BAR_WIDTH, COLORS.track);
-  // DrawContext has no native gradient fill; use the red accent directly.
-  roundedFill(BAR_WIDTH * clampPercentage(percentage) / 100, COLORS.accent);
+function drawProgressArc(percentage) {
+  const context = new DrawContext();
+  context.size = new Size(112, 68);
+  context.opaque = false;
+  context.respectScreenScale = true;
+  function strokeArc(fraction, color) {
+    if (fraction <= 0) return;
+    const steps = Math.max(1, Math.ceil(fraction * 90));
+    const path = new Path();
+    let start, end;
+    for (let i = 0; i <= steps; i++) {
+      const angle = Math.PI + Math.PI * fraction * i / steps;
+      const point = new Point(56 + 53 * Math.cos(angle), 56 + 53 * Math.sin(angle));
+      if (i === 0) { start = point; path.move(point); }
+      else path.addLine(point);
+      end = point;
+    }
+    context.setStrokeColor(color);
+    context.setLineWidth(5);
+    context.addPath(path);
+    context.strokePath();
+    context.setFillColor(color);
+    for (const point of [start, end]) context.fillEllipse(new Rect(point.x - 2.5, point.y - 2.5, 5, 5));
+  }
+  strokeArc(1, new Color(COLORS.muted, 0.25));
+  strokeArc(clampPercentage(percentage) / 100, new Color(COLORS.accent));
   return context.getImage();
 }
 
@@ -426,18 +471,20 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
   if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
   widget.backgroundColor = new Color(COLORS.background);
   widget.setPadding(12, 12, 12, 12);
-  // iOS applies the outer widget corner shape.
   const header = widget.addStack();
   header.centerAlignContent();
-  const title = header.addStack();
-  title.size = new Size(96, 14);
-  addText(title, data && data.plan_name ? data.plan_name : "Consumo", Font.boldSystemFont(11), COLORS.text);
-  header.addSpacer();
-  addText(header, "Bait", Font.boldSystemFont(8), COLORS.text);
-
+  if (SETTINGS.showPlanName !== false) {
+    const title = header.addStack();
+    title.size = new Size(96, 14);
+    addText(title, data && data.plan_name ? data.plan_name : "Consumo", Font.boldSystemFont(11), COLORS.text);
+    header.addSpacer();
+    addText(header, CARRIER_NAME, Font.boldSystemFont(8), COLORS.accent);
+  } else {
+    addText(header, CARRIER_NAME, Font.boldSystemFont(11), COLORS.accent);
+  }
   if (!data) {
     widget.addSpacer();
-    addText(widget, setupRequired ? "Configura Bait" : "No se pudo cargar", Font.boldSystemFont(13), COLORS.text);
+    addText(widget, setupRequired ? `Configura ${CARRIER_NAME}` : "No se pudo cargar", Font.boldSystemFont(13), COLORS.text);
     widget.addSpacer(5);
     addText(widget, setupRequired ? "Abre Scriptable para configurar" : "Intenta más tarde", Font.systemFont(11), COLORS.muted);
     widget.addSpacer();
@@ -445,31 +492,57 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     return widget;
   }
 
-  widget.addSpacer(3);
-  const reading = widget.addStack();
+  const style = chartStyle();
+  widget.addSpacer();
+  const body = widget.addStack();
+  body.addSpacer();
+  let balanceParent = body;
+  if (style === "arc") {
+    const arc = body.addStack();
+    arc.layoutVertically();
+    arc.size = new Size(112, 68);
+    arc.backgroundImage = drawProgressArc(data.used_percentage);
+    arc.addSpacer(30);
+    balanceParent = arc;
+  }
+  const reading = balanceParent.addStack();
   reading.bottomAlignContent();
-  addText(reading, formatGB(data.remaining_gb), Font.boldSystemFont(34), COLORS.text);
+  if (style === "arc") {
+    reading.size = new Size(112, 38);
+    reading.addSpacer();
+  }
+  const value = formatGB(data.remaining_gb);
+  const valueSize = style === "arc" ? (value.length > 4 ? 30 : 32) : style === "none" ? 40 : 34;
+  addText(reading, value, Font.boldSystemFont(valueSize), COLORS.text);
   reading.addSpacer(4);
   const unit = reading.addStack();
   unit.layoutVertically();
   addText(unit, "GB", Font.mediumSystemFont(14), COLORS.muted);
   unit.addSpacer(7);
-  addText(widget, (data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_gb)} GB` : `disponibles de ${formatGB(data.total_gb)} GB`), Font.systemFont(10), COLORS.muted);
-
-  widget.addSpacer(3);
-  const progress = widget.addImage(drawProgressBar(data.used_percentage));
-  progress.imageSize = new Size(BAR_WIDTH, BAR_HEIGHT);
-  progress.leftAlignImage();
-  widget.addSpacer(3);
-  addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted);
+  if (style === "arc") reading.addSpacer();
+  body.addSpacer();
+  addText(widget,
+    data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_gb)} GB` : `disponibles de ${formatGB(data.total_gb)} GB`,
+    Font.systemFont(10), COLORS.muted).centerAlignText();
+  if (style === "bar") {
+    widget.addSpacer(4);
+    const bar = widget.addStack();
+    bar.addSpacer();
+    const progress = bar.addImage(drawProgressBar(data.used_percentage));
+    progress.imageSize = new Size(BAR_WIDTH, BAR_HEIGHT);
+    bar.addSpacer();
+  }
+  if (style !== "none") {
+    widget.addSpacer(3);
+    addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted).centerAlignText();
+  }
   widget.addSpacer();
   if (data.expiration_date !== null) {
     addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
-    widget.addSpacer(3);
   }
   if (updateFailed) {
     widget.addSpacer(3);
-    addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.accent);
+    addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.warning);
   }
   addExecutionTime(widget);
   return widget;

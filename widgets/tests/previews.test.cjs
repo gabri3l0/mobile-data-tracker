@@ -22,7 +22,7 @@ function preview(search = '', options = {}) {
     const listeners = {};
     const element = {
       value: (tag.match(/\bvalue="([^"]*)"/)?.[1] || '').replaceAll('&amp;', '&'),
-      hidden: /\bhidden\b/.test(tag), disabled: /\bdisabled\b/.test(tag),
+      hidden: /\bhidden\b/.test(tag), disabled: /\bdisabled\b/.test(tag), checked: /\bchecked\b/.test(tag),
       style: { setProperty(key, value) { this[key] = value; } }, classList: classes(),
       setAttribute(key, value) { this[key] = value; },
       getAttribute(key) { return this[key] ?? null; },
@@ -40,6 +40,7 @@ function preview(search = '', options = {}) {
   });
   elements.background.removeAttribute = key => { if (key === 'src') imageSrc = undefined; };
   elements.carrier.value = 'telcel'; elements.design.value = 'solid'; elements.state.value = 'success';
+  elements.theme.value = 'dark'; elements['chart-style'].value = 'bar';
   class BrowserURL extends URL {
     static createObjectURL(blob) { state.blobs.push(blob); return 'blob:test'; }
     static revokeObjectURL() {}
@@ -230,4 +231,91 @@ test('clipboard failure selects the full code for manual copying', async () => {
   assert.equal(el.code.focused, true);
   assert.equal(el.code.selected, true);
   assert.match(el['code-status'].textContent, /manualmente/);
+});
+
+test('themes apply preset palettes and switch to custom after any manual color edit', () => {
+  const { elements: el } = preview();
+  assert.equal(el.theme.value, 'dark');
+  assert.equal(el['primary-hex'].value, 'FFFFFF');
+  el.theme.value = 'light'; el.theme.emit('change');
+  assert.equal(el.hex.value, 'F5F5F7');
+  assert.equal(el['primary-hex'].value, '18181B');
+  assert.equal(el['secondary-hex'].value, '52525B');
+  assert.equal(el.card.style['--warning'], '#9A3412');
+  el.carrier.value = 'bait'; el.carrier.emit('change');
+  assert.equal(el['accent-hex'].value, 'FFC700');
+  el['primary-picker'].value = '#abcdef'; el['primary-picker'].emit('input');
+  assert.equal(el.theme.value, 'custom');
+  assert.equal(el['primary-hex'].value, 'ABCDEF');
+  el.carrier.value = 'telcel'; el.carrier.emit('change');
+  assert.equal(el['primary-hex'].value, 'ABCDEF');
+  assert.equal(el['accent-hex'].value, 'FFC700');
+  el.theme.value = 'dark'; el.theme.emit('change');
+  assert.equal(el.hex.value, '101012');
+  assert.equal(el['primary-hex'].value, 'FFFFFF');
+  assert.equal(el['accent-hex'].value, 'FF453A');
+});
+
+test('text and accent validation block export while preserving the last valid palette', async () => {
+  for (const key of ['primary', 'secondary', 'accent']) {
+    const { elements: el } = preview();
+    await el['generate-code'].emit('click');
+    const before = el.card.style[`--${key}`];
+    el[`${key}-hex`].value = 'invalid'; el[`${key}-hex`].emit('input');
+    assert.equal(el[`${key}-error`].hidden, false);
+    assert.equal(el.card.style[`--${key}`], before);
+    assert.equal(el['generate-code'].disabled, true);
+    assert.equal(el['copy-code'].disabled, true);
+    el[`${key}-picker`].value = '#246810'; el[`${key}-picker`].emit('input');
+    assert.equal(el[`${key}-error`].hidden, true);
+    assert.equal(el['generate-code'].disabled, false);
+  }
+});
+
+test('all chart modes and independent colors export correctly for every canonical script', async () => {
+  for (const carrier of ['telcel', 'bait']) {
+    for (const design of ['solid', 'image']) {
+      for (const chart of ['bar', 'arc', 'none']) {
+        const { elements: el } = preview(`?carrier=${carrier}&design=${design}&primary=112233&secondary=445566&accent=00aacc&chart=${chart}&plan=false`);
+        assert.equal(el.plan.textContent, carrier === 'bait' ? 'Bait' : 'Telcel');
+        assert.equal(el['carrier-badge'].hidden, true);
+        assert.equal(el.arc.hidden, chart !== 'arc');
+        assert.equal(el.progress.hidden, chart !== 'bar');
+        assert.equal(el.percentage.hidden, chart === 'none');
+        assert.equal(el.card.style['--track'], 'rgba(68, 85, 102, 0.25)');
+        if (chart === 'arc') assert.ok(Number(el['arc-fill'].style.strokeDashoffset) > 0);
+        await el['generate-code'].emit('click');
+        const settings = exportedSettings(el.code.value);
+        assert.equal(settings.textPrimaryHex, '112233');
+        assert.equal(settings.textSecondaryHex, '445566');
+        assert.equal(settings.accentHex, '00AACC');
+        assert.equal(settings.chartStyle, chart);
+        assert.equal(settings.showPlanName, false);
+        assert.equal(settings.useSampleData, false);
+        assert.equal(settings.debug, false);
+        el['show-plan'].checked = true; el['show-plan'].emit('change');
+        assert.equal(el['copy-code'].disabled, true);
+        assert.equal(el['carrier-badge'].hidden, false);
+      }
+    }
+  }
+});
+
+test('theme and opacity changes do not reload images; chart edits invalidate generated code', async () => {
+  const { elements: el, state } = preview('?design=image&image=https://example.com/a.jpg&overlay=0.4');
+  el.background.onload();
+  assert.equal(state.images.length, 1);
+  el.theme.value = 'light'; el.theme.emit('change');
+  assert.equal(el['image-url'].value, 'https://example.com/a.jpg');
+  assert.equal(el.opacity.value, '0.4');
+  assert.equal(state.images.length, 1);
+  await el['generate-code'].emit('click');
+  el['chart-style'].value = 'arc'; el['chart-style'].emit('change');
+  assert.equal(el['copy-code'].disabled, true);
+  assert.equal(el.code.value, '');
+  assert.equal(el.card.classList.contains('is-arc'), true);
+  assert.equal(state.images.length, 1);
+  el['chart-style'].value = 'none'; el['chart-style'].emit('change');
+  assert.equal(el.card.classList.contains('is-none'), true);
+  assert.equal(el.arc.hidden, true);
 });

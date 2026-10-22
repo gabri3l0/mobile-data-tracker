@@ -45,7 +45,7 @@ async function loadWidget(design, options = {}) {
   source = source.replace(/\nawait main\(\);\s*$/, '');
   const state = {
     now: NOW, keys: new Map(), files: new Map(), queue: [], alerts: [], prompts: [],
-    requests: [], logs: [], texts: [], widgets: [], previews: 0, completed: 0,
+    requests: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
     writeError: false, removeError: false, keyWriteError: false,
     ...options,
   };
@@ -117,14 +117,16 @@ async function loadWidget(design, options = {}) {
     }
   }
   class Node {
-    addText(value) { state.texts.push(String(value)); return new Node(); }
-    addStack() { return new Node(); }
-    addImage() { return new Node(); }
+    constructor(kind = 'stack') { this.kind = kind; this.children = []; state.nodes.push(this); }
+    addText(value) { state.texts.push(String(value)); const node = new Node('text'); node.value = String(value); this.children.push(node); return node; }
+    addStack() { const node = new Node(); this.children.push(node); return node; }
+    addImage(image) { const node = new Node('image'); node.image = image; this.children.push(node); return node; }
     addSpacer() {}
     centerAlignContent() {}
     bottomAlignContent() {}
     layoutVertically() {}
     leftAlignImage() {}
+    centerAlignText() { this.textAlignment = 'center'; }
     setPadding() {}
   }
   class ListWidget extends Node {
@@ -134,11 +136,22 @@ async function loadWidget(design, options = {}) {
   class Size { constructor(width, height) { this.width = width; this.height = height; } }
   class Rect { constructor(x, y, width, height) { Object.assign(this, { x, y, width, height }); } }
   class Color { constructor(hex, opacity = 1) { Object.assign(this, { hex, opacity }); } }
-  class Path { addRoundedRect() {} }
+  class Point { constructor(x, y) { Object.assign(this, { x, y }); } }
+  class Path {
+    constructor() { this.points = []; this.rects = []; }
+    addRoundedRect(rect) { this.rects.push(rect); }
+    move(point) { this.points.push(point); }
+    addLine(point) { this.points.push(point); }
+  }
   class DrawContext {
-    setFillColor() {}
-    addPath() {}
-    fillPath() {}
+    constructor() { this.operations = []; state.drawings.push(this); }
+    setFillColor(color) { this.fillColor = color; }
+    setStrokeColor(color) { this.strokeColor = color; }
+    setLineWidth(width) { this.lineWidth = width; }
+    addPath(path) { this.path = path; }
+    fillPath() { this.operations.push({ type: 'fill', path: this.path, color: this.fillColor }); }
+    strokePath() { this.operations.push({ type: 'stroke', path: this.path, color: this.strokeColor, width: this.lineWidth }); }
+    fillEllipse(rect) { this.operations.push({ type: 'ellipse', rect, color: this.fillColor }); }
     fillRect() {}
     drawImageInRect() {}
     getImage() { return { size: { width: this.size.width, height: this.size.height } }; }
@@ -152,7 +165,7 @@ async function loadWidget(design, options = {}) {
         state.keys.set(name, value);
       },
     },
-    FileManager: { local: () => files }, Alert, Request, ListWidget, Size, Rect, Color, Path, DrawContext,
+    FileManager: { local: () => files }, Alert, Request, ListWidget, Size, Rect, Color, Point, Path, DrawContext,
     Font: { systemFont: size => ({ size }), boldSystemFont: size => ({ size }), mediumSystemFont: size => ({ size }) },
     Data: {
       fromString: value => ({ toBase64String: () => Buffer.from(value, 'utf8').toString('base64') }),
@@ -164,7 +177,7 @@ async function loadWidget(design, options = {}) {
   const hooks = await new vm.Script(`(async () => {\n${source}\nreturn {
     SETTINGS, SAMPLE_DATA, KEYCHAIN_KEY, CACHE_FILE, readCredentials, configureCredentials,
     credentialsForRun, parseUsage, isUsageData, loadUsage, fetchUsage, readCache, writeCache,
-    retryDeadline, createWidget, main,
+    retryDeadline, createWidget, main, COLORS, drawProgressBar, drawProgressArc,
     loadBackgroundImage: typeof loadBackgroundImage === 'function' ? loadBackgroundImage : null,
   };\n})()`, { filename: `${carrier}-${design}.js` }).runInContext(context);
   if (options.settings) Object.assign(hooks.SETTINGS, options.settings);

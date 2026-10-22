@@ -29,7 +29,8 @@ Click a screenshot to open the generator with that carrier and design selected.
 - Remaining data and a usage progress bar.
 - Plan name, expiration date, and days remaining.
 - Account details stored in iOS Keychain.
-- Customizable solid colors and background images.
+- Dark, light, and custom themes with text and accent colors.
+- Solid or image backgrounds with bar, semicircle, or chart-free layouts.
 - Saved readings available when updates fail.
 - One timestamp showing when the script last ran.
 

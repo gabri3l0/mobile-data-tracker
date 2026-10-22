@@ -8,7 +8,7 @@
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #242428; background: #f6f4f2; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; padding: 48px 24px; }
-    main { max-width: 760px; margin: auto; }
+    main { max-width: 1120px; margin: auto; }
     .eyebrow { color: #8b5551; font-size: 11px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; }
     h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.04em; margin: 12px 0; font-weight: 650; }
     .intro, .note { color: #747177; font-size: 13px; line-height: 1.6; }
@@ -16,31 +16,31 @@
     button:focus-visible, input:focus-visible { outline: 2px solid #d94137; outline-offset: 3px; }
     .zoom { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #747177; }
     input { width: 80px; accent-color: #d94137; }
-    .stage { min-height: 470px; display: grid; place-items: center; border: 1px solid #e7e0dc; border-radius: 24px; background: radial-gradient(ellipse at 48% 55%, #ead7d0 0, #eee5df 38%, #f1ece7 80%); padding: 24px; overflow: auto; }
+    .stage { min-height: 420px; display: grid; place-items: center; border: 1px solid #e7e0dc; border-radius: 24px; background: radial-gradient(ellipse at 48% 55%, #ead7d0 0, #eee5df 38%, #f1ece7 80%); padding: 24px; overflow: auto; }
     .frame { width: 340px; height: 340px; flex-shrink: 0; }
-    .card { width: 170px; height: 170px; padding: 12px; border-radius: 22px; background: #101012; color: white; display: flex; flex-direction: column; transform: scale(2); transform-origin: top left; box-shadow: 0 12px 24px #2d1e1920; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .card { width: 170px; height: 170px; padding: 12px; border-radius: 22px; background: #101012; color: var(--primary, #fff); display: flex; flex-direction: column; transform: scale(2); transform-origin: top left; box-shadow: 0 12px 24px #2d1e1920; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .header { display: flex; gap: 6px; align-items: center; justify-content: space-between; height: 14px; flex-shrink: 0; }
     .title { max-width: 96px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: -.3px; }
     .badge { flex-shrink: 0; font-size: 8px; font-weight: 700; color: var(--accent, #ff453a); }
-    .usage { margin-top: 3px; }
+    .usage { margin-top: auto; margin-bottom: auto; }
     .reading { display: flex; gap: 4px; align-items: baseline; height: 38px; }
-    .value { font-size: 34px; line-height: 38px; letter-spacing: -1.4px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .unit { font-size: 14px; font-weight: 500; color: #929298; }
-    .available { font-size: 10px; line-height: 12px; color: #929298; }
-    .track { width: 112px; height: 7px; border-radius: 4px; overflow: hidden; background: #2c2c30; margin-top: 3px; }
+    .value { font-size: var(--value-size, 34px); line-height: 38px; letter-spacing: -1.4px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .unit { font-size: var(--unit-size, 14px); font-weight: 500; color: var(--secondary, #929298); }
+    .available { text-align: center; font-size: 10px; line-height: 12px; color: var(--secondary, #929298); }
+    .track { width: 112px; height: 7px; border-radius: 4px; overflow: hidden; background: var(--track, #2c2c30); margin: 4px auto 0; }
     .fill { height: 100%; background: var(--accent, #ff453a); border-radius: inherit; }
-    .percentage { margin-top: 3px; font-size: 9px; line-height: 11px; color: #929298; }
-    .footer { margin-top: auto; color: #929298; }
+    .percentage { text-align: center; margin-top: 3px; font-size: 9px; line-height: 11px; color: var(--secondary, #929298); }
+    .footer { margin-top: 0; color: var(--secondary, #929298); }
     .expiration { font-size: 9px; line-height: 11px; }
-    .execution { flex-shrink: 0; font-size: 7px; line-height: 9px; margin-top: 3px; color: #929298; font-variant-numeric: tabular-nums; }
-    .warning { color: var(--accent, #ff453a); font-size: 8px; line-height: 10px; margin-top: 3px; white-space: pre-line; }
+    .execution { flex-shrink: 0; font-size: 8px; line-height: 10px; margin-top: 3px; color: var(--secondary, #929298); font-variant-numeric: tabular-nums; }
+    .warning { color: var(--warning, #ffb454); font-size: 8px; line-height: 10px; margin-top: 3px; white-space: pre-line; }
     .empty { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
     .empty strong { font-size: 13px; }
-    .empty span { font-size: 11px; color: #929298; }
+    .empty span { font-size: 11px; color: var(--secondary, #929298); }
     [hidden] { display: none !important; }
     .note { margin: 16px 0 0; }
     @media (max-width: 420px) { body { padding: 28px 14px; } .stage { padding: 16px; min-height: 400px; } }
-    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 24px 0 16px; }
+    .controls { display: grid; gap: 16px; }
     label { display: grid; gap: 7px; font-size: 12px; color: #5e5a59; }
     select, input[type="text"], input[type="url"], textarea { width: 100%; min-width: 0; border: 1px solid #d9d3cf; border-radius: 9px; padding: 10px 12px; background: white; color: #242428; font: inherit; font-size: 13px; }
     select { min-height: 39px; }
@@ -62,7 +62,6 @@
     .card { position: relative; isolation: isolate; overflow: hidden; }
     .background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: -2; }
     .has-background::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--overlay-opacity, .65)); z-index: -1; pointer-events: none; }
-    .image-design .badge, .image-design .unit, .image-design .available, .image-design .percentage, .image-design .footer, .image-design .execution, .image-design .empty span { color: #fff; }
   
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     .actions button { background: #242428; color: white; }
@@ -73,6 +72,35 @@
     details { margin-top: 20px; font-size: 12px; color: #747177; }
     details label { margin-top: 12px; max-width: 280px; }
     summary { cursor: pointer; }
+
+    .builder { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 32px; align-items: start; margin-top: 28px; }
+    .control-panel { min-width: 0; }
+    .preview-panel { min-width: 0; position: sticky; top: 24px; }
+    .control-panel details { border-top: 1px solid #e7e0dc; padding-top: 16px; margin-top: 20px; }
+    .control-panel summary { color: #242428; font-size: 14px; font-weight: 600; }
+    .control-panel details label { max-width: none; }
+    .control-panel .image-options { margin-top: 16px; }
+    .control-panel .image-controls { grid-template-columns: minmax(0, 1fr); }
+    .control-panel .image-controls button { justify-self: start; }
+    .control-panel .zoom { margin-left: 0; }
+    .check { display: flex; align-items: center; gap: 8px; }
+    .check input { width: auto; margin: 0; }
+    .usage-row { display: flex; align-items: center; justify-content: center; }
+    .reading { min-width: 0; }
+    .arc { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 112px; height: 68px; }
+    .arc svg { display: block; width: 112px; height: 68px; overflow: visible; }
+    .arc-track { stroke: var(--track); }
+    .arc-fill { stroke: var(--accent); }
+    .is-arc .usage-row { position: relative; height: 68px; align-items: flex-end; }
+    .is-arc .reading { position: relative; z-index: 1; justify-content: center; }
+    .is-arc .value { letter-spacing: -1px; }
+    .hide-plan .title { max-width: 146px; color: var(--accent); }
+    @media (max-width: 760px) {
+      .builder { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+      .preview-panel { grid-row: 1; position: static; }
+      .control-panel { grid-row: 2; }
+      .stage { min-height: 340px; }
+    }
   </style>
 </head>
 <body>
@@ -80,24 +108,57 @@
     <div class="eyebrow">Mobile Data Tracker</div>
     <h1>Crea tu widget</h1>
     <p class="intro">Elige tu operador y fondo, genera el código y pégalo en Scriptable.<br>La vista usa datos de ejemplo. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain.</p>
-    <div class="controls">
-      <label>Operador<select id="carrier"><option value="telcel">Telcel</option><option value="bait">Bait</option></select></label>
-      <label>Diseño<select id="design"><option value="solid">Color sólido</option><option value="image">Imagen de fondo</option></select></label>
-      <label>Color de fondo<span class="color-control"><input id="color-picker" type="color" value="#101012" aria-label="Selector de color"><input id="hex" type="text" value="101012" maxlength="7" spellcheck="false" aria-label="Color hexadecimal" aria-describedby="color-error"></span></label>
-    </div>
-    <p class="status validation" id="color-error" role="status" hidden>Usa seis dígitos hexadecimales, por ejemplo 101012.</p>
-    <section class="image-options" id="image-settings" aria-label="Fondo de imagen" hidden>
+    <div class="builder">
+      <aside class="control-panel" aria-label="Personaliza tu widget">
+        <div class="controls">
+          <label>Operador<select id="carrier"><option value="telcel">Telcel</option><option value="bait">Bait</option></select></label>
+          <label>Diseño<select id="design"><option value="solid">Color sólido</option><option value="image">Imagen de fondo</option></select></label>
+          <label>Tema<select id="theme"><option value="dark">Oscuro</option><option value="light">Claro</option><option value="custom">Personalizado</option></select></label>
+        </div>
+        <details open>
+          <summary>Fondo</summary>
+          <label>Color de fondo<span class="color-control"><input id="color-picker" type="color" value="#101012" aria-label="Selector de color"><input id="hex" type="text" value="101012" maxlength="7" spellcheck="false" aria-label="Color hexadecimal" aria-describedby="color-error"></span></label>
+          <p class="status validation" id="color-error" role="status" hidden>Usa seis dígitos hexadecimales, por ejemplo 101012.</p>
+          <section class="image-options" id="image-settings" aria-label="Fondo de imagen" hidden>
       <div class="image-controls"><label>URL de la imagen<input id="image-url" type="url" value="" placeholder="https://..." aria-describedby="image-status"></label><button id="apply-image" type="button">Aplicar imagen</button></div>
       <p class="status" id="image-status" role="status"></p>
       <label>Oscurecimiento <output id="opacity-value" for="opacity">0.65</output><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.65"></label>
     </section>
+        </details>
+        <details open>
+          <summary>Apariencia</summary>
+          <label>Texto principal<span class="color-control"><input id="primary-picker" type="color" value="#FFFFFF" aria-label="Selector: Texto principal"><input id="primary-hex" type="text" value="FFFFFF" maxlength="7" spellcheck="false" aria-label="Hexadecimal: Texto principal" aria-describedby="primary-error"></span></label>
+          <p class="status validation" id="primary-error" role="status" hidden>Usa seis dígitos hexadecimales.</p>
+          <label>Texto secundario<span class="color-control"><input id="secondary-picker" type="color" value="#929298" aria-label="Selector: Texto secundario"><input id="secondary-hex" type="text" value="929298" maxlength="7" spellcheck="false" aria-label="Hexadecimal: Texto secundario" aria-describedby="secondary-error"></span></label>
+          <p class="status validation" id="secondary-error" role="status" hidden>Usa seis dígitos hexadecimales.</p>
+          <label>Acento<span class="color-control"><input id="accent-picker" type="color" value="#FF453A" aria-label="Selector: Acento"><input id="accent-hex" type="text" value="FF453A" maxlength="7" spellcheck="false" aria-label="Hexadecimal: Acento" aria-describedby="accent-error"></span></label>
+          <p class="status validation" id="accent-error" role="status" hidden>Usa seis dígitos hexadecimales.</p>
+          <p class="note">El acento se usa en el gráfico y el nombre del operador.</p>
+          <label>Gráfico<select id="chart-style"><option value="bar">Barra</option><option value="arc">Arco</option><option value="none">Sin gráfico</option></select></label>
+          <label class="check"><input id="show-plan" type="checkbox" checked>Mostrar nombre del paquete</label>
+        </details>
+    <details>
+      <summary>Opciones avanzadas</summary>
+      <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+    <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
+    </details>
+      </aside>
+      <div class="preview-panel">
     <div class="stage">
       <div class="frame" id="frame">
         <article class="card" id="card" aria-label="Vista previa del consumo de datos">
           <img class="background" id="background" alt="" referrerpolicy="no-referrer" hidden>
           <header class="header"><span class="title" id="plan">Consumo</span><span class="badge" id="carrier-badge">Telcel</span></header>
           <section class="usage" id="usage">
-            <div class="reading"><span class="value" id="remaining"></span><span class="unit">GB</span></div>
+            <div class="usage-row">
+              <div class="reading"><span class="value" id="remaining"></span><span class="unit">GB</span></div>
+              <div class="arc" id="arc" hidden>
+                <svg id="arc-svg" viewBox="0 0 112 68" role="img" aria-label="Porcentaje utilizado">
+                  <path class="arc-track" d="M3 56 A53 53 0 0 1 109 56" fill="none" stroke-width="5" stroke-linecap="round"/>
+                  <path class="arc-fill" id="arc-fill" d="M3 56 A53 53 0 0 1 109 56" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" fill="none" stroke-width="5" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
             <div class="available" id="available"></div>
             <div class="track" role="progressbar" aria-label="Datos utilizados" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="fill" id="fill"></div></div>
             <div class="percentage" id="percentage"></div>
@@ -108,11 +169,6 @@
         </article>
       </div>
     </div>
-    <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
-    <details>
-      <summary>Probar otros estados de la vista previa</summary>
-      <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
-    </details>
     <section class="code-section" aria-labelledby="code-title">
       <h2 id="code-title">Llévalo a Scriptable</h2>
       <p class="intro">Genera tu script completo. Cópialo en un nuevo script de Scriptable y ejecútalo con ▶ para guardar tu cuenta. Después, agrega un widget pequeño de Scriptable a tu pantalla de inicio y selecciona ese script.</p>
@@ -121,6 +177,8 @@
       <label id="code-output" hidden>Código completo<textarea id="code" rows="12" readonly spellcheck="false"></textarea></label>
       <p class="note">¿Necesitas ayuda? <a href="https://github.com/gabri3l0/mobile-data-tracker/blob/main/widgets/README.es.md">Ver la guía</a> · <a href="https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/">Abrir generador en línea</a></p>
     </section>
+      </div>
+    </div>
     <p class="note">El código generado consulta tu consumo real; los estados de ejemplo solo afectan esta vista. El diseño aproxima el de iOS: confirma el resultado en Scriptable.</p>
   </main>
   <script>
@@ -140,7 +198,6 @@ const SAMPLES = {
   },
 };
 const sources = new Map();
-let appliedHex = "101012";
 let appliedImageUrl = "";
 let backgroundReady = false;
 let revision = 0;
@@ -148,14 +205,13 @@ let busy = false;
 let generated = null;
 
 function imageDesign() { return $("design").value === "image"; }
-function validHex() { return /^#?[0-9a-f]{6}$/i.test($("hex").value.trim()); }
 function validImage() {
   const value = $("image-url").value.trim();
   if (!value) return true;
   try { return ["http:", "https:"].includes(new URL(value).protocol); }
   catch { return false; }
 }
-function validAppearance() { return validHex() && (!imageDesign() || validImage()); }
+function validAppearance() { return Object.values(colorFields).every(([input]) => validHex($(input).value)) && (!imageDesign() || validImage()); }
 function invalidateCode() {
   revision++;
   generated = null;
@@ -170,18 +226,58 @@ function formatRunTime(value) {
   const pad = number => String(number).padStart(2, "0");
   return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${String(value.getFullYear()).slice(-2)} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
-function applyHex(value) {
-  const valid = /^#?[0-9a-f]{6}$/i.test(value.trim());
-  $("hex").setAttribute("aria-invalid", String(!valid));
-  $("color-error").hidden = valid;
+const colorFields = {
+  backgroundHex: ["hex", "color-picker", "color-error"],
+  textPrimaryHex: ["primary-hex", "primary-picker", "primary-error"],
+  textSecondaryHex: ["secondary-hex", "secondary-picker", "secondary-error"],
+  accentHex: ["accent-hex", "accent-picker", "accent-error"],
+};
+const appliedColors = { backgroundHex: "101012", textPrimaryHex: "FFFFFF", textSecondaryHex: "929298", accentHex: "FF453A" };
+function validHex(value = $("hex").value) { return /^#?[0-9a-f]{6}$/i.test(value.trim()); }
+function chartStyle() { return ["bar", "arc", "none"].includes($("chart-style").value) ? $("chart-style").value : "bar"; }
+function refreshPalette() {
+  const palette = appliedColors;
+  $("card").style.backgroundColor = `#${palette.backgroundHex}`;
+  for (const [name, key] of [["primary", "textPrimaryHex"], ["secondary", "textSecondaryHex"], ["accent", "accentHex"]]) {
+    $("card").style.setProperty(`--${name}`, `#${palette[key]}`);
+  }
+  const rgb = [0, 2, 4].map(index => parseInt(palette.textSecondaryHex.slice(index, index + 2), 16));
+  $("card").style.setProperty("--track", `rgba(${rgb.join(", ")}, 0.25)`);
+  const bg = [0, 2, 4].map(index => parseInt(palette.backgroundHex.slice(index, index + 2), 16));
+  const brightness = (bg[0] * 299 + bg[1] * 587 + bg[2] * 114) / 1000;
+  $("card").style.setProperty("--warning", brightness > 140 ? "#9A3412" : "#FFB454");
+}
+function applyColor(key, value, manual = true) {
+  const [input, picker, error] = colorFields[key];
+  const valid = validHex(value);
+  $(input).setAttribute("aria-invalid", String(!valid));
+  $(error).hidden = valid;
+  if (manual) $("theme").value = "custom";
   if (valid) {
-    appliedHex = value.trim().replace(/^#/, "").toUpperCase();
-    $("hex").value = appliedHex;
-    $("color-picker").value = `#${appliedHex}`;
-    $("card").style.backgroundColor = `#${appliedHex}`;
+    const hex = value.trim().replace(/^#/, "").toUpperCase();
+    appliedColors[key] = hex;
+    $(input).value = hex;
+    $(picker).value = `#${hex}`;
+    refreshPalette();
   }
   invalidateCode();
 }
+function applyHex(value) { applyColor("backgroundHex", value); }
+function applyTheme() {
+  const theme = $("theme").value;
+  if (theme !== "custom") {
+    const light = theme === "light";
+    const palette = {
+      backgroundHex: light ? "F5F5F7" : "101012",
+      textPrimaryHex: light ? "18181B" : "FFFFFF",
+      textSecondaryHex: light ? "52525B" : "929298",
+      accentHex: $("carrier").value === "bait" ? "FFC700" : "FF453A",
+    };
+    for (const [key, value] of Object.entries(palette)) applyColor(key, value, false);
+  }
+  invalidateCode();
+}
+
 function updateBackgroundVisibility() {
   const show = imageDesign() && backgroundReady && !["error", "setup"].includes($("state").value);
   $("background").hidden = !show;
@@ -237,9 +333,17 @@ function render() {
   } : SAMPLES[carrier];
   const name = isBait ? "Bait" : "Telcel";
   const empty = ["error", "setup"].includes(state);
-  $("card").style.setProperty("--accent", isBait ? "#ffc700" : "#ff453a");
   $("carrier-badge").textContent = name;
-  $("plan").textContent = empty ? "Consumo" : data.plan_name;
+  const showPlan = $("show-plan").checked;
+  $("plan").textContent = showPlan ? (empty ? "Consumo" : data.plan_name) : name;
+  $("carrier-badge").hidden = !showPlan;
+  $("card").classList.toggle("hide-plan", !showPlan);
+  const style = chartStyle();
+  $("card").classList.toggle("is-arc", style === "arc");
+  $("card").classList.toggle("is-none", style === "none");
+  $("arc").hidden = style !== "arc";
+  $("progress").hidden = style !== "bar";
+  $("percentage").hidden = style === "none";
   $("usage").hidden = empty;
   $("footer").hidden = empty;
   $("empty").hidden = !empty;
@@ -248,13 +352,19 @@ function render() {
   $("execution").textContent = `Última ejecución · ${formatRunTime(RUN_AT)}`;
   updateBackgroundVisibility();
   if (empty) return;
-  $("remaining").textContent = data.remaining_gb.toFixed(1);
+  const balance = data.remaining_gb.toFixed(1);
+  $("remaining").textContent = balance;
+  const valueSize = style === "arc" ? (balance.length > 4 ? 30 : 32) : style === "none" ? 40 : 34;
+  $("card").style.setProperty("--value-size", `${valueSize}px`);
+  $("card").style.setProperty("--unit-size", "14px");
   $("available").textContent = data.data_tier === "throttled"
     ? `Velocidad reducida · ${data.total_gb.toFixed(1)} GB` : `disponibles de ${data.total_gb.toFixed(1)} GB`;
   const used = Math.min(100, Math.max(0, data.used_percentage || 0));
   $("fill").style.width = `${used}%`;
   $("progress").setAttribute("aria-valuenow", String(used));
   $("percentage").textContent = `${Math.round(used)}% utilizado`;
+  $("arc-fill").style.strokeDashoffset = String(100 - used);
+  $("arc-svg").setAttribute("aria-label", `${Math.round(used)}% utilizado`);
   const [, month, day] = data.expiration_date.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
@@ -297,7 +407,7 @@ async function generateCode() {
   const carrier = $("carrier").value;
   const design = $("design").value;
   const key = `${carrier}/${design}`;
-  const appearance = { backgroundHex: appliedHex };
+  const appearance = { ...appliedColors, chartStyle: chartStyle(), showPlanName: $("show-plan").checked };
   if (imageDesign()) {
     applyImage();
     appearance.backgroundImageUrl = $("image-url").value.trim();
@@ -359,11 +469,16 @@ function downloadCode() {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-$("carrier").addEventListener("change", () => { invalidateCode(); render(); });
+$("carrier").addEventListener("change", () => { applyTheme(); render(); });
+$("theme").addEventListener("change", applyTheme);
+$("chart-style").addEventListener("change", () => { invalidateCode(); render(); });
+$("show-plan").addEventListener("change", () => { invalidateCode(); render(); });
 $("design").addEventListener("change", setDesign);
 $("state").addEventListener("change", () => { render(); applyImage(); });
-$("hex").addEventListener("input", event => applyHex(event.target.value));
-$("color-picker").addEventListener("input", event => applyHex(event.target.value));
+for (const [key, [input, picker]] of Object.entries(colorFields)) {
+  $(input).addEventListener("input", event => applyColor(key, event.target.value));
+  $(picker).addEventListener("input", event => applyColor(key, event.target.value));
+}
 $("zoom").addEventListener("input", event => setZoom(Number(event.target.value)));
 $("image-url").addEventListener("input", () => {
   invalidateCode();
@@ -389,7 +504,15 @@ const opacity = params.get("overlay");
 if (opacity !== null && opacity.trim() && Number.isFinite(Number(opacity))) $("opacity").value = String(Math.max(0, Math.min(1, Number(opacity))));
 $("card").style.setProperty("--overlay-opacity", $("opacity").value);
 $("opacity-value").textContent = $("opacity").value;
-applyHex(params.get("hex") || $("hex").value);
+if (["dark", "light"].includes(params.get("theme"))) $("theme").value = params.get("theme");
+applyTheme();
+if (params.get("theme") === "custom") $("theme").value = "custom";
+for (const [key, param] of [["backgroundHex", "hex"], ["textPrimaryHex", "primary"], ["textSecondaryHex", "secondary"], ["accentHex", "accent"]]) {
+  if (params.has(param)) applyColor(key, params.get(param));
+}
+if (["bar", "arc", "none"].includes(params.get("chart"))) $("chart-style").value = params.get("chart");
+if (params.get("plan") === "false") $("show-plan").checked = false;
+refreshPalette();
 setZoom(window.innerWidth < 420 ? 1.5 : 2);
 setDesign();
   </script>

@@ -28,7 +28,8 @@ Haz clic en una captura para abrir el generador con ese operador y diseño selec
 - Datos restantes y barra de consumo.
 - Nombre del paquete, fecha de vencimiento y días restantes.
 - Datos de tu cuenta guardados en el Keychain de iOS.
-- Colores sólidos e imágenes de fondo personalizables.
+- Temas oscuro, claro y personalizado, con colores de texto y acento.
+- Fondos sólidos o con imagen e indicadores de barra, arco o sin gráfico.
 - Lecturas guardadas disponibles si falla la actualización.
 - Una fecha y hora que indica cuándo se ejecutó el script por última vez.
 
