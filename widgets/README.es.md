@@ -15,7 +15,7 @@ ni computadora. Android aún no es compatible.
 
 ## Instalar en iPhone
 
-¿No sabes cómo editar el código? Usa el **[generador de widgets](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: elige tu operador y diseño, ajusta el color o la imagen y el oscurecimiento, y pulsa **Generar código** y **Copiar código**. También puedes descargar el archivo `.js` completo.
+¿No sabes cómo editar el código? Usa el **[generador de widgets](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: elige tu operador, diseño y tema; ajusta los colores y el gráfico, y pulsa **Generar código** y **Copiar código**. También puedes descargar el archivo `.js` completo.
 
 1. Instala [Scriptable](https://scriptable.app) en tu iPhone.
 2. Crea un script, pega el código generado o todo el archivo JS que elegiste y ponle un nombre.
@@ -64,9 +64,23 @@ Usa el [generador](https://gabri3l0.github.io/mobile-data-tracker/widgets/previe
 
 | Ajuste | Qué cambiar |
 | --- | --- |
-| `backgroundHex` | Reemplázalo con un color hexadecimal de seis dígitos sin `#`, como `123456`. |
+| `backgroundHex` | Color de fondo y respaldo: seis dígitos sin `#`, como `123456`. |
+| `textPrimaryHex` | Color del saldo y del nombre del paquete. |
+| `textSecondaryHex` | Color de los detalles y del fondo del indicador, que usa 25% de opacidad. |
+| `accentHex` | Color del indicador y del nombre del operador. |
+| `chartStyle` | `bar`: barra; `arc`: medio círculo centrado sobre el saldo; `none`: saldo centrado sin gráfico. |
+| `showPlanName` | `true` muestra el paquete; `false` deja solo el operador en el encabezado. |
 | `backgroundImageUrl` | Solo para el diseño con imagen: reemplázalo con la URL de tu imagen. Usa `""` para un fondo de color sólido. |
 | `backgroundOverlayOpacity` | Solo para el diseño con imagen: `0` no oscurece la imagen; `1` la cubre de negro. |
+
+En el generador puedes elegir **Oscuro**, **Claro** o **Personalizado**. Los temas
+aplican una paleta inicial; al editar cualquier color pasas a Personalizado. Cambiar
+de operador conserva tus colores personalizados. La imagen y su oscurecimiento
+se mantienen al cambiar de tema. El código generado incluye los colores elegidos.
+
+La barra y el arco indican el porcentaje **utilizado**; el saldo grande muestra
+los datos restantes. El arco es un medio círculo de 180° centrado sobre el saldo, no un anillo completo. El saldo, la barra y el porcentaje se muestran centrados.
+Los avisos de error mantienen un color independiente del acento.
 
 La [vista previa y generador](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/) muestra datos de ejemplo y genera un script completo para consultar tu consumo real. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain. El código se obtiene de los archivos JS de cada operador.
 

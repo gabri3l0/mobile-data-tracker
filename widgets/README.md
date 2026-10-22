@@ -16,7 +16,7 @@ or computer needed. Android is not supported yet.
 
 ## Install on iPhone
 
-Not sure how to edit the code? Use the **[widget generator](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: choose your carrier and design, adjust the color or image and opacity, then press **Generar código** and **Copiar código**. You can also download the complete `.js` file.
+Not sure how to edit the code? Use the **[widget generator](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/)**: choose your carrier, design, and theme, adjust colors and chart style, then press **Generar código** and **Copiar código**. You can also download the complete `.js` file.
 
 1. Install [Scriptable](https://scriptable.app) on your iPhone.
 2. Create a script, paste the generated code or the entire JS file you chose above, and give it a name.
@@ -64,9 +64,23 @@ Use the [generator](https://gabri3l0.github.io/mobile-data-tracker/widgets/previ
 
 | Setting | What to change |
 | --- | --- |
-| `backgroundHex` | Replace with a six-digit hex color without `#`, such as `123456`. |
+| `backgroundHex` | Background and fallback color: six hex digits without `#`, such as `123456`. |
+| `textPrimaryHex` | Balance and plan-name color. |
+| `textSecondaryHex` | Details and chart-track color; the track uses 25% opacity. |
+| `accentHex` | Chart fill and carrier-label color. |
+| `chartStyle` | `bar`: progress bar; `arc`: centered semicircle above the balance; `none`: centered balance without a chart. |
+| `showPlanName` | `true` shows the plan; `false` keeps only the carrier in the header. |
 | `backgroundImageUrl` | Image design only: replace with your image URL. Use `""` for a solid background. |
 | `backgroundOverlayOpacity` | Image design only: `0` means no dark overlay; `1` means fully black. |
+
+Choose **Oscuro**, **Claro**, or **Personalizado** in the generator. Themes apply a
+starting palette; editing any color switches to Personalizado. Changing carriers
+preserves custom colors. Themes keep the selected image and overlay opacity.
+Generated scripts include the final color values.
+
+The bar and arc show the percentage **used**; the large balance shows remaining
+data. The arc is a centered 180° semicircle above the balance, not a full ring. The balance, bar, and percentage are centered in every layout. Error messages keep a separate
+warning color independent of the accent.
 
 The [preview and generator](https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/) uses sample data for display and generates a complete script for live usage. Account setup happens in Scriptable; credentials stay in Keychain. The existing carrier JS files are the source of the generated code.
 
