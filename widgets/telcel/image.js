@@ -310,7 +310,7 @@ function parseUsage(response) {
   if (expiration < readingDate) expiration = date(year + 1, months.indexOf(due[2]) + 1, Number(due[1]));
   const segments = component("tabs-plans-v2-limited-cutoff-message-0-0-0").segments;
   if (!Array.isArray(segments) || segments.some(s => !s || typeof s.text !== "string")) throw diagnosticError("usage_data");
-  const days = /Faltan\s+(\d+)/i.exec(segments.map(s => s.text).join(""));
+  const days = /\bFaltan?\s+(\d+)\b/i.exec(segments.map(s => s.text).join(""));
   if (!days) throw diagnosticError("usage_data");
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: Number(days[1]),
