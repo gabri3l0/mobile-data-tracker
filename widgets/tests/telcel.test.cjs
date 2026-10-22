@@ -6,6 +6,21 @@ const { loadWidget, homeResponse, fullFlow, CREDENTIALS, KEY, CACHE, NOW } = req
 const plain = value => JSON.parse(JSON.stringify(value));
 
 for (const design of ['solid', 'image']) {
+  test(`${design}: cutoff parser supports singular, plural and split formatted segments`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const [prefix, days, suffix] of [['Falta ', 1, 'día'], ['Faltan ', 2, 'días'], ['Faltan ', 0, 'días'], ['FALTA\u00a0', 1, 'día']]) {
+      const home = homeResponse();
+      home.data.components.at(-1).config.segments = [
+        { text: prefix }, { text: `${days} ${suffix}`, fontWeight: 500 },
+        { text: ' para que venza tu paquete' },
+      ];
+      assert.equal(hooks.parseUsage(home).days_until, days);
+    }
+    const home = homeResponse();
+    home.data.components.at(-1).config.segments = [{ text: 'Falta un día' }];
+    assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+  });
+
   test(`${design}: direct Telcel flow and logout preserve the carrier reading`, async () => {
     const { hooks, state } = await loadWidget(design, { queue: fullFlow() });
     const data = await hooks.fetchUsage(CREDENTIALS);
