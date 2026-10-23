@@ -294,7 +294,7 @@ function parseUsage(response) {
     if (result.getUTCFullYear() !== year || result.getUTCMonth() !== month - 1 || result.getUTCDate() !== day) throw diagnosticError("usage_data");
     return result;
   }
-  const plan = value("tabs-plans-v2-plan-name-0-0-0");
+  const plan = value(response.id === "home-corpo" ? "text-plan-name" : "tabs-plans-v2-plan-name-0-0-0");
   const total = number("tabs-plans-v2-total-data-value-0-0-0");
   const used = number("tabs-plans-v2-used-data-value-0-0-0");
   const remaining = number("tabs-plans-v2-available-data-value-0-0-0");

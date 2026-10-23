@@ -5,14 +5,35 @@ const path = require('node:path');
 const { loadWidget, homeResponse, fullFlow, CREDENTIALS, KEY, CACHE, NOW } = require('./scriptable-mock.cjs');
 const plain = value => JSON.parse(JSON.stringify(value));
 
+const CORPORATE_PLAN = 'TELCEL CORPORATIVO CONTROLADO VPN 6 SR';
+function corporateHomeResponse() {
+  const home = homeResponse();
+  home.id = 'home-corpo';
+  home.data.components[0] = { id: 'text-plan-name', config: { value: CORPORATE_PLAN } };
+  return home;
+}
+
 for (const design of ['solid', 'image']) {
+  test(`${design}: plan name matches personal or corporate account type`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const corporate of [false, true]) {
+      const home = homeResponse();
+      home.data.components.push({ id: 'text-plan-name', config: { value: CORPORATE_PLAN } });
+      if (corporate) {
+        home.id = 'home-corpo';
+        home.data.components[0].config.value = 'Datos de mi plan';
+      }
+      assert.equal(hooks.parseUsage(home).plan_name, corporate ? CORPORATE_PLAN : 'Plan 20 GB');
+    }
+  });
+
   test(`${design}: corporate cutoff uses carrier reading date when due date is absent`, async () => {
     const { hooks } = await loadWidget(design);
     for (const [updated, days, expected] of [
       ['22/10/2026', 29, '2026-11-20'], ['30/12/2026', 3, '2027-01-02'],
       ['28/02/2028', 1, '2028-02-29'], ['22/10/2026', 0, '2026-10-22'],
     ]) {
-      const components = homeResponse().data.components;
+      const components = corporateHomeResponse().data.components;
       components.splice(5, 1);
       components[4].config.value = `Información al ${updated} 20:08 h`;
       components.at(-1).config.segments = [
@@ -20,6 +41,7 @@ for (const design of ['solid', 'image']) {
         { text: ' días para el próximo corte' },
       ];
       const result = hooks.parseUsage({ id: 'home-corpo', blocks: { children: components } });
+      assert.equal(result.plan_name, CORPORATE_PLAN);
       assert.equal(result.expiration_date, expected);
       assert.equal(result.days_until, days);
       assert.equal(result.remaining_gb, 15);
@@ -28,8 +50,7 @@ for (const design of ['solid', 'image']) {
 
   test(`${design}: corporate cutoff preserves explicit dates and rejects malformed dates`, async () => {
     const { hooks } = await loadWidget(design);
-    const home = homeResponse();
-    home.id = 'home-corpo';
+    const home = corporateHomeResponse();
     home.data.components[5].config.value = '5 de enero';
     assert.equal(hooks.parseUsage(home).expiration_date, '2027-01-05');
     for (const config of [undefined, null, {}, { value: 'invalid' }]) {
@@ -37,6 +58,7 @@ for (const design of ['solid', 'image']) {
       assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
     }
     delete home.id;
+    home.data.components[0].id = 'tabs-plans-v2-plan-name-0-0-0';
     home.data.components.splice(5, 1);
     assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
   });

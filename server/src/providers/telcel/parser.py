@@ -52,7 +52,10 @@ def parse_usage(response: dict[str, object]) -> UsageData:
                 f"Carrier home response has an invalid number for {component_id}."
             ) from None
 
-    plan = get("tabs-plans-v2-plan-name-0-0-0")
+    plan = get(
+        "text-plan-name" if response.get("id") == "home-corpo"
+        else "tabs-plans-v2-plan-name-0-0-0"
+    )
     total = number("tabs-plans-v2-total-data-value-0-0-0")
     used = number("tabs-plans-v2-used-data-value-0-0-0")
     remaining = number("tabs-plans-v2-available-data-value-0-0-0")
