@@ -79,10 +79,13 @@ def parse_usage(response: dict[str, object]) -> UsageData:
         raise ValueError("Carrier home response has invalid cutoff message segments.")
     message = "".join(s["text"] for s in segments)
     days_match = re.search(r"\bFaltan?\s+(\d+)\b", message, re.IGNORECASE)
-    if days_match is None:
+    if re.fullmatch(r"\s*Hoy\s+vence\s+tu\s+paquete\.?\s*", message, re.IGNORECASE):
+        days_until = 0
+    elif days_match is not None:
+        days_until = int(days_match.group(1))
+    else:
         logger.error("Carrier cutoff message is missing the number of days remaining.")
         raise ValueError("Carrier cutoff message is missing the number of days remaining.")
-    days_until = int(days_match.group(1))
     logger.debug("Telcel days remaining: %d", days_until)
 
     if response.get("id") == "home-corpo" and find(response, "text-due-value") is None:

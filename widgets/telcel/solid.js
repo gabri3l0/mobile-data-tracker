@@ -300,11 +300,14 @@ function parseUsage(response) {
   const readingDate = date(year, Number(parts[2]), Number(parts[1]));
   const segments = component("tabs-plans-v2-limited-cutoff-message-0-0-0").segments;
   if (!Array.isArray(segments) || segments.some(s => !s || typeof s.text !== "string")) throw diagnosticError("usage_data");
-  const days = /\bFaltan?\s+(\d+)\b/i.exec(segments.map(s => s.text).join(""));
-  if (!days) throw diagnosticError("usage_data");
+  const message = segments.map(s => s.text).join("");
+  const days = /\bFaltan?\s+(\d+)\b/i.exec(message);
+  const expiresToday = /^\s*Hoy\s+vence\s+tu\s+paquete\.?\s*$/i.test(message);
+  if (!days && !expiresToday) throw diagnosticError("usage_data");
+  const daysUntil = expiresToday ? 0 : Number(days[1]);
   let expiration;
   if (response.id === "home-corpo" && find(response, "text-due-value") === undefined) {
-    expiration = new Date(readingDate.getTime() + Number(days[1]) * 86400000);
+    expiration = new Date(readingDate.getTime() + daysUntil * 86400000);
     if (!Number.isFinite(expiration.getTime())) throw diagnosticError("usage_data");
   } else {
     const due = /^(\d{1,2}) de ([a-z]+)$/.exec(value("text-due-value").trim().toLowerCase());
@@ -314,7 +317,7 @@ function parseUsage(response) {
     if (expiration < readingDate) expiration = date(year + 1, months.indexOf(due[2]) + 1, Number(due[1]));
   }
   const data = {
-    plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: Number(days[1]),
+    plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: daysUntil,
     last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`,
     total_gb: total, used_gb: used, remaining_gb: remaining,
     used_percentage: total ? Math.round(used / total * 10000) / 100 : null,

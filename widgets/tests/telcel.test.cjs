@@ -14,6 +14,28 @@ function corporateHomeResponse() {
 }
 
 for (const design of ['solid', 'image']) {
+  test(`${design}: cutoff parser recognizes a package expiring today`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const corporate of [false, true]) {
+      for (const message of ['Hoy vence tu paquete', ' HOY\u00a0VENCE TU PAQUETE. ']) {
+        const home = corporate ? corporateHomeResponse() : homeResponse();
+        home.data.components[5].config.value = '30 de diciembre';
+        home.data.components[6].config.segments = [
+          { text: message.slice(0, 4) }, { text: message.slice(4), fontWeight: 500 },
+        ];
+        if (corporate) home.data.components.splice(5, 1);
+        const result = hooks.parseUsage(home);
+        assert.equal(result.days_until, 0);
+        assert.equal(result.expiration_date, '2026-12-30');
+      }
+    }
+    for (const message of ['Hoy no vence tu paquete', 'Mañana vence tu paquete']) {
+      const home = homeResponse();
+      home.data.components[6].config.segments = [{ text: message }];
+      assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+    }
+  });
+
   test(`${design}: plan name matches personal or corporate account type`, async () => {
     const { hooks } = await loadWidget(design);
     for (const corporate of [false, true]) {
