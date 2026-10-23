@@ -265,7 +265,7 @@ async function fetchUsage(credentials) {
 function parseUsage(response) {
   function find(node, id) {
     if (node && typeof node === "object") {
-      if (node.id === id) return node.config;
+      if (node.id === id) return node.config ?? null;
       for (const value of Object.values(node)) {
         const result = find(value, id);
         if (result !== undefined) return result;
@@ -294,7 +294,7 @@ function parseUsage(response) {
     if (result.getUTCFullYear() !== year || result.getUTCMonth() !== month - 1 || result.getUTCDate() !== day) throw diagnosticError("usage_data");
     return result;
   }
-  const plan = value("tabs-plans-v2-plan-name-0-0-0");
+  const plan = value(response.id === "home-corpo" ? "text-plan-name" : "tabs-plans-v2-plan-name-0-0-0");
   const total = number("tabs-plans-v2-total-data-value-0-0-0");
   const used = number("tabs-plans-v2-used-data-value-0-0-0");
   const remaining = number("tabs-plans-v2-available-data-value-0-0-0");
@@ -303,15 +303,21 @@ function parseUsage(response) {
   if (!parts || Number(parts[4]) > 23 || Number(parts[5]) > 59) throw diagnosticError("usage_data");
   const year = Number(parts[3]);
   const readingDate = date(year, Number(parts[2]), Number(parts[1]));
-  const due = /^(\d{1,2}) de ([a-z]+)$/.exec(value("text-due-value").trim().toLowerCase());
-  const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-  if (!due || !months.includes(due[2])) throw diagnosticError("usage_data");
-  let expiration = date(year, months.indexOf(due[2]) + 1, Number(due[1]));
-  if (expiration < readingDate) expiration = date(year + 1, months.indexOf(due[2]) + 1, Number(due[1]));
   const segments = component("tabs-plans-v2-limited-cutoff-message-0-0-0").segments;
   if (!Array.isArray(segments) || segments.some(s => !s || typeof s.text !== "string")) throw diagnosticError("usage_data");
   const days = /\bFaltan?\s+(\d+)\b/i.exec(segments.map(s => s.text).join(""));
   if (!days) throw diagnosticError("usage_data");
+  let expiration;
+  if (response.id === "home-corpo" && find(response, "text-due-value") === undefined) {
+    expiration = new Date(readingDate.getTime() + Number(days[1]) * 86400000);
+    if (!Number.isFinite(expiration.getTime())) throw diagnosticError("usage_data");
+  } else {
+    const due = /^(\d{1,2}) de ([a-z]+)$/.exec(value("text-due-value").trim().toLowerCase());
+    const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    if (!due || !months.includes(due[2])) throw diagnosticError("usage_data");
+    expiration = date(year, months.indexOf(due[2]) + 1, Number(due[1]));
+    if (expiration < readingDate) expiration = date(year + 1, months.indexOf(due[2]) + 1, Number(due[1]));
+  }
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: Number(days[1]),
     last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`,

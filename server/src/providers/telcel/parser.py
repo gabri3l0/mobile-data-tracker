@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.models import UsageData
 
@@ -17,7 +17,7 @@ def parse_usage(response: dict[str, object]) -> UsageData:
     def find(obj, component_id: str):
         if isinstance(obj, dict):
             if obj.get("id") == component_id:
-                return obj.get("config", {})
+                return obj.get("config", {}) if obj.get("config") is not None else {}
             for value in obj.values():
                 result = find(value, component_id)
                 if result is not None:
@@ -52,7 +52,10 @@ def parse_usage(response: dict[str, object]) -> UsageData:
                 f"Carrier home response has an invalid number for {component_id}."
             ) from None
 
-    plan = get("tabs-plans-v2-plan-name-0-0-0")
+    plan = get(
+        "text-plan-name" if response.get("id") == "home-corpo"
+        else "tabs-plans-v2-plan-name-0-0-0"
+    )
     total = number("tabs-plans-v2-total-data-value-0-0-0")
     used = number("tabs-plans-v2-used-data-value-0-0-0")
     remaining = number("tabs-plans-v2-available-data-value-0-0-0")
@@ -66,23 +69,6 @@ def parse_usage(response: dict[str, object]) -> UsageData:
     except ValueError:
         logger.error("Carrier home response has an invalid last-update-text date.")
         raise ValueError("Carrier home response has an invalid last-update-text date.") from None
-
-    expiration = get("text-due-value")
-    months = {
-        name: i for i, name in enumerate(
-            ["enero", "febrero", "marzo", "abril", "mayo", "junio",
-             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
-            1
-        )
-    }
-    try:
-        day, month = expiration.strip().lower().split(" de ")
-        expiration_date = datetime(last_updated.year, months[month], int(day)).date()
-        if expiration_date < last_updated.date():
-            expiration_date = expiration_date.replace(year=expiration_date.year + 1)
-    except (KeyError, ValueError):
-        logger.error("Carrier home response has an invalid text-due-value date.")
-        raise ValueError("Carrier home response has an invalid text-due-value date.") from None
 
     segments = config("tabs-plans-v2-limited-cutoff-message-0-0-0").get("segments")
     if not isinstance(segments, list) or not all(
@@ -99,6 +85,25 @@ def parse_usage(response: dict[str, object]) -> UsageData:
     days_until = int(days_match.group(1))
     logger.debug("Telcel days remaining: %d", days_until)
 
+    if response.get("id") == "home-corpo" and find(response, "text-due-value") is None:
+        expiration_date = last_updated.date() + timedelta(days=days_until)
+    else:
+        expiration = get("text-due-value")
+        months = {
+            name: i for i, name in enumerate(
+                ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                 "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+                1
+            )
+        }
+        try:
+            day, month = expiration.strip().lower().split(" de ")
+            expiration_date = datetime(last_updated.year, months[month], int(day)).date()
+            if expiration_date < last_updated.date():
+                expiration_date = expiration_date.replace(year=expiration_date.year + 1)
+        except (KeyError, ValueError):
+            logger.error("Carrier home response has an invalid text-due-value date.")
+            raise ValueError("Carrier home response has an invalid text-due-value date.") from None
     usage: UsageData = {
         "plan_name": plan,
         "expiration_date": expiration_date.isoformat(),
