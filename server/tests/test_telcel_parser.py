@@ -107,6 +107,34 @@ def test_singular_and_plural_cutoff_messages(home_response, prefix, days, suffix
     assert parse_usage(home_response)["days_until"] == days
 
 
+@pytest.mark.parametrize("corporate", [False, True])
+@pytest.mark.parametrize("message", ["Hoy vence tu paquete", " HOY\u00a0VENCE TU PAQUETE. "])
+def test_package_expires_today(home_response, corporate, message, caplog, capsys):
+    components = home_response["data"]["components"]
+    components[5]["config"]["value"] = "30 de diciembre"
+    components[6]["config"]["segments"] = [
+        {"text": message[:4]}, {"text": message[4:], "fontWeight": 500},
+    ]
+    if corporate:
+        home_response["id"] = "home-corpo"
+        components[0]["id"] = "text-plan-name"
+        components.pop(5)
+    with caplog.at_level("DEBUG", logger="src.providers.telcel.parser"):
+        result = parse_usage(home_response)
+    assert result["days_until"] == 0
+    assert result["expiration_date"] == "2026-12-30"
+    assert "Telcel days remaining: 0" in caplog.text
+    assert message not in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("message", ["Hoy no vence tu paquete", "Mañana vence tu paquete"])
+def test_other_cutoff_messages_still_fail(home_response, message):
+    home_response["data"]["components"][6]["config"]["segments"] = [{"text": message}]
+    with pytest.raises(ValueError, match="missing the number of days"):
+        parse_usage(home_response)
+
+
 @pytest.mark.parametrize("level", ["INFO", "DEBUG"])
 def test_days_debug_log_omits_response_text(home_response, caplog, capsys, level):
     home_response["data"]["components"][6]["config"]["segments"] = [
