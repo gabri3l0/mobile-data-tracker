@@ -36,6 +36,48 @@ def test_zero_total(home_response):
     assert result["remaining_percentage"] is None
 
 
+@pytest.mark.parametrize("available,unit,expected", [
+    ("1,000", "MB", 1.0), ("1000", "MB", 1.0), (1000, "MB", 1.0),
+    ("500", "MB", 0.5), ("512.5", "MB", 0.5125), ("5", "MB", 0.005),
+    ("1", "MB", 0.001), ("0", "MB", 0.0), ("0.5", "GB", 0.5),
+    ("1", "GB", 1.0), ("1,000", "GB", 1000.0),
+])
+def test_available_mb_normalized_to_gb(home_response, available, unit, expected):
+    components = home_response["data"]["components"]
+    for component, value in zip(components, ["Amigo Sin Límite 200", "7", "6", available]):
+        component["config"]["value"] = value
+    components.append({
+        "id": "tabs-plans-v2-available-data-unit-0-0-0", "config": {"value": unit},
+    })
+    result = parse_usage(home_response)
+    assert result["total_gb"] == 7
+    assert result["used_gb"] == 6
+    assert result["remaining_gb"] == expected
+    assert result["remaining_percentage"] == round(expected / 7 * 100, 2)
+
+
+@pytest.mark.parametrize("value", ["1,00", "1,,000", ",1000", "1,000,", "1,5"])
+def test_malformed_grouped_number_still_fails(home_response, value):
+    home_response["data"]["components"][3]["config"]["value"] = value
+    with pytest.raises(ValueError, match="invalid number"):
+        parse_usage(home_response)
+
+
+@pytest.mark.parametrize("kind,index,field", [
+    ("total", 1, "total_gb"), ("used", 2, "used_gb"), ("available", 3, "remaining_gb"),
+])
+def test_data_units_in_nested_rows(home_response, kind, index, field):
+    components = home_response["data"]["components"]
+    components[index]["config"]["value"] = "5"
+    unit = {"id": f"tabs-plans-v2-{kind}-data-unit-0-0-0", "config": {"value": " mb "}}
+    components[index] = {"type": "list", "children": [components[index], unit]}
+    assert parse_usage(home_response)[field] == 0.005
+    for invalid in ("TB", "", None, True):
+        unit["config"]["value"] = invalid
+        with pytest.raises(ValueError, match="invalid.*data-unit"):
+            parse_usage(home_response)
+
+
 @pytest.mark.parametrize("corporate", [False, True])
 def test_plan_name_matches_account_type(home_response, corporate):
     home_response["data"]["components"].append({

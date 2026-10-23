@@ -29,6 +29,16 @@ comparten una cuenta por operador. Para cambiarla, ejecuta el script y elige
 **Cambiar datos**. Al ejecutarlo manualmente verás **Ver widget**, **Cambiar datos**
 y **Cancelar**; las actualizaciones automáticas en la pantalla de inicio no muestran menú.
 
+Telcel conserva la unidad de cada lectura: un saldo de `1,000 MB` se muestra
+como `1,000 MB` y los saldos en GB permanecen en GB. Los porcentajes usan una
+unidad común (1000 MB = 1 GB): `5 MB` equivale a `0.005 GB` para el gráfico,
+pero se sigue mostrando como `5 MB`. Los datos totales, usados y restantes
+consultan su propia unidad. Los saldos de Bait se muestran en GB.
+
+Para actualizar un widget instalado, reemplaza todo el script con el código
+más reciente del generador o del archivo JS. Se conservan la cuenta guardada
+y las lecturas anteriores en GB; una consulta nueva obtiene la unidad MB/GB actual.
+
 ## Cómo se actualiza
 
 El consumo se guarda en un archivo JSON local durante **30 minutos**. Si falla

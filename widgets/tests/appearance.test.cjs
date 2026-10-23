@@ -14,7 +14,7 @@ for (const carrier of ['telcel', 'bait']) {
       } });
       hooks.createWidget({ data: hooks.SAMPLE_DATA, updateFailed: true });
       const text = value => state.nodes.find(node => node.kind === 'text' && node.value === value);
-      assert.equal(text(hooks.SAMPLE_DATA.remaining_gb.toFixed(1)).textColor.hex, '112233');
+      assert.equal(text((hooks.SAMPLE_DATA.remaining_data ?? hooks.SAMPLE_DATA.remaining_gb).toFixed(1)).textColor.hex, '112233');
       assert.equal(text('GB').textColor.hex, '445566');
       assert.equal(text(carrier === 'bait' ? 'Bait' : 'Telcel').textColor.hex, '00AACC');
       assert.equal(state.texts.includes(hooks.SAMPLE_DATA.plan_name), false);
@@ -63,7 +63,7 @@ for (const carrier of ['telcel', 'bait']) {
       for (const chartStyle of ['bar', 'arc', 'none']) {
         const { hooks, state } = await loadWidget(design, { carrier, settings: { chartStyle } });
         const data = { ...hooks.SAMPLE_DATA, plan_name: 'A very long plan name that must fit one line',
-          remaining_gb: 105, total_gb: 105, used_percentage: null,
+          ...(carrier === 'telcel' ? { remaining_data: 105, total_data: 105 } : { remaining_gb: 105, total_gb: 105 }), used_percentage: null,
           ...(carrier === 'bait' ? { data_tier: 'throttled' } : {}) };
         hooks.createWidget({ data, updateFailed: true });
         assert.ok(state.texts.includes('105.0'));

@@ -27,6 +27,7 @@ Click a screenshot to open the generator with that carrier and design selected.
 ## Widget features
 
 - Remaining data and a usage progress bar.
+- Telcel balances displayed in the carrier’s MB or GB unit.
 - Plan name, expiration date, and days remaining.
 - Account details stored in iOS Keychain.
 - Dark, light, and custom themes with text and accent colors.

@@ -40,7 +40,7 @@ const BAR_WIDTH = 112;
 const BAR_HEIGHT = 7;
 const SAMPLE_DATA = {
   plan_name: "Plan 7 GB", expiration_date: "2026-10-24", days_until: 5,
-  last_updated: "2026-10-18T01:30:00", total_gb: 7, used_gb: 5.4, remaining_gb: 1.6,
+  last_updated: "2026-10-18T01:30:00", total_data: 7, total_unit: "GB", used_data: 5.4, used_unit: "GB", remaining_data: 1.6, remaining_unit: "GB",
   used_percentage: 77.14, remaining_percentage: 22.86,
 };
 
@@ -135,7 +135,8 @@ async function credentialsForRun() {
 function isUsageData(data) {
   return data !== null && typeof data === "object" && !Array.isArray(data)
     && typeof data.plan_name === "string"
-    && ["total_gb", "used_gb", "remaining_gb", "days_until"].every(key => typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0)
+    && ["total_data", "used_data", "remaining_data", "days_until"].every(key => typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0)
+    && ["total_unit", "used_unit", "remaining_unit"].every(key => ["MB", "GB"].includes(data[key]))
     && Number.isInteger(data.days_until)
     && ["used_percentage", "remaining_percentage"].every(key => data[key] === null || (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0))
     && typeof data.last_updated === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(data.last_updated)
@@ -147,6 +148,14 @@ function readCache(credentials) {
     const { files, path } = cacheLocation();
     if (!files.fileExists(path)) return null;
     const cache = JSON.parse(files.readString(path));
+    // Preserve saved GB readings from earlier widget versions.
+    if (cache.data && cache.data.total_data === undefined) {
+      for (const field of ["total", "used", "remaining"]) {
+        cache.data[`${field}_data`] = cache.data[`${field}_gb`];
+        cache.data[`${field}_unit`] = "GB";
+        delete cache.data[`${field}_gb`];
+      }
+    }
     if (cache.profileId !== credentials.profileId || !(cache.data === null || isUsageData(cache.data))
       || !Number.isFinite(cache.fetchedAt) || cache.fetchedAt < 0 || cache.fetchedAt > Date.now()
       || !Number.isFinite(cache.retryAt) || cache.retryAt < 0) return null;
@@ -284,7 +293,11 @@ function parseUsage(response) {
     return String(result);
   }
   function number(id) {
-    const text = value(id);
+    let text = value(id).trim();
+    if (text.includes(",")) {
+      if (!/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(text)) throw diagnosticError("usage_data");
+      text = text.replace(/,/g, "");
+    }
     const result = Number(text);
     if (!text.trim() || !Number.isFinite(result) || result < 0) throw diagnosticError("usage_data");
     return result;
@@ -295,9 +308,21 @@ function parseUsage(response) {
     return result;
   }
   const plan = value(response.id === "home-corpo" ? "text-plan-name" : "tabs-plans-v2-plan-name-0-0-0");
-  const total = number("tabs-plans-v2-total-data-value-0-0-0");
-  const used = number("tabs-plans-v2-used-data-value-0-0-0");
-  const remaining = number("tabs-plans-v2-available-data-value-0-0-0");
+  function dataReading(kind) {
+    const amount = number(`tabs-plans-v2-${kind}-data-value-0-0-0`);
+    const unitId = `tabs-plans-v2-${kind}-data-unit-0-0-0`;
+    // Older responses without unit components were expressed in GB.
+    const unit = find(response, unitId) === undefined ? "GB" : value(unitId).trim().toUpperCase();
+    if (["MB", "GB"].includes(unit)) return { amount, unit };
+    throw diagnosticError("usage_data");
+  }
+  const totalReading = dataReading("total");
+  const usedReading = dataReading("used");
+  const remainingReading = dataReading("available");
+  const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
+  const total = toGB(totalReading);
+  const used = toGB(usedReading);
+  const remaining = toGB(remainingReading);
   const updated = value("last-update-text").replace("Información al ", "").replace(" h", "").trim();
   const parts = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(updated);
   if (!parts || Number(parts[4]) > 23 || Number(parts[5]) > 59) throw diagnosticError("usage_data");
@@ -324,7 +349,9 @@ function parseUsage(response) {
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: daysUntil,
     last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`,
-    total_gb: total, used_gb: used, remaining_gb: remaining,
+    total_data: totalReading.amount, total_unit: totalReading.unit,
+    used_data: usedReading.amount, used_unit: usedReading.unit,
+    remaining_data: remainingReading.amount, remaining_unit: remainingReading.unit,
     used_percentage: total ? Math.round(used / total * 10000) / 100 : null,
     remaining_percentage: total ? Math.round(remaining / total * 10000) / 100 : null,
   };
@@ -562,18 +589,22 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     reading.size = new Size(112, 38);
     reading.addSpacer();
   }
-  const value = formatGB(data.remaining_gb);
+  const remainingUnit = data.remaining_unit ?? "GB";
+  const remainingAmount = data.remaining_data ?? data.remaining_gb;
+  const value = remainingUnit === "MB"
+    ? remainingAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })
+    : formatGB(remainingAmount);
   const valueSize = style === "arc" ? (value.length > 4 ? 30 : 32) : style === "none" ? 40 : 34;
   addText(reading, value, Font.boldSystemFont(valueSize), COLORS.text);
   reading.addSpacer(4);
   const unit = reading.addStack();
   unit.layoutVertically();
-  addText(unit, "GB", Font.mediumSystemFont(14), COLORS.muted);
+  addText(unit, remainingUnit, Font.mediumSystemFont(14), COLORS.muted);
   unit.addSpacer(7);
   if (style === "arc") reading.addSpacer();
   body.addSpacer();
   addText(widget,
-    data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_gb)} GB` : `disponibles de ${formatGB(data.total_gb)} GB`,
+    data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_data ?? data.total_gb)} ${data.total_unit ?? "GB"}` : `disponibles de ${formatGB(data.total_data ?? data.total_gb)} ${data.total_unit ?? "GB"}`,
     Font.systemFont(10), COLORS.muted).centerAlignText();
   if (style === "bar") {
     widget.addSpacer(4);

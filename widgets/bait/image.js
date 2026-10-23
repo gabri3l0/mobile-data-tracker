@@ -511,18 +511,22 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     reading.size = new Size(112, 38);
     reading.addSpacer();
   }
-  const value = formatGB(data.remaining_gb);
+  const remainingUnit = data.remaining_unit ?? "GB";
+  const remainingAmount = data.remaining_data ?? data.remaining_gb;
+  const value = remainingUnit === "MB"
+    ? remainingAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })
+    : formatGB(remainingAmount);
   const valueSize = style === "arc" ? (value.length > 4 ? 30 : 32) : style === "none" ? 40 : 34;
   addText(reading, value, Font.boldSystemFont(valueSize), COLORS.text);
   reading.addSpacer(4);
   const unit = reading.addStack();
   unit.layoutVertically();
-  addText(unit, "GB", Font.mediumSystemFont(14), COLORS.muted);
+  addText(unit, remainingUnit, Font.mediumSystemFont(14), COLORS.muted);
   unit.addSpacer(7);
   if (style === "arc") reading.addSpacer();
   body.addSpacer();
   addText(widget,
-    data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_gb)} GB` : `disponibles de ${formatGB(data.total_gb)} GB`,
+    data.data_tier === "throttled" ? `Velocidad reducida · ${formatGB(data.total_data ?? data.total_gb)} ${data.total_unit ?? "GB"}` : `disponibles de ${formatGB(data.total_data ?? data.total_gb)} ${data.total_unit ?? "GB"}`,
     Font.systemFont(10), COLORS.muted).centerAlignText();
   if (style === "bar") {
     widget.addSpacer(4);

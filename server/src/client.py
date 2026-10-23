@@ -33,9 +33,12 @@ class MobileDataTracker:
         else:
             raise ValueError("Unsupported carrier.")
 
-    def get_usage_data(self) -> UsageData:
+    def get_usage_data(self, *, preserve_units: bool = False) -> UsageData | dict[str, object]:
         logger.info("Retrieving usage data.")
-        usage = self._provider.get_usage_data()
+        if preserve_units and isinstance(self._provider, TelcelProvider):
+            usage = self._provider.get_usage_data(preserve_units=True)
+        else:
+            usage = self._provider.get_usage_data()
         logger.info("Usage data retrieved successfully.")
         return usage
 

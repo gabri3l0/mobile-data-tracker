@@ -30,6 +30,16 @@ per carrier. To change it, run the script and choose **Cambiar datos**.
 Manual runs show **Ver widget**, **Cambiar datos**, and **Cancelar**; automatic
 home-screen updates show no menu.
 
+Telcel preserves each reading’s carrier unit: a remaining balance of `1,000 MB`
+is displayed as `1,000 MB`, while a GB balance stays in GB. Percentages use a
+common unit (1000 MB = 1 GB), so `5 MB` is treated as `0.005 GB` for the chart
+and still displayed as `5 MB`. Total, used, and remaining readings each use their
+own unit. Bait balances are displayed in GB.
+
+To update an installed widget, replace its entire script with the latest code
+from the generator or JS file. Saved account details and older GB readings
+remain usable; a fresh carrier reading supplies the current MB/GB unit.
+
 ## Refresh behavior
 
 Usage is saved in a local JSON file for **30 minutes**. A failed lookup keeps the

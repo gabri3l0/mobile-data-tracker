@@ -14,6 +14,91 @@ function corporateHomeResponse() {
 }
 
 for (const design of ['solid', 'image']) {
+  test(`${design}: mixed unit balances render the carrier value and percentage`, async () => {
+    const { hooks, state } = await loadWidget(design);
+    for (const [amount, label] of [['1,000', '1,000'], ['5', '5'], ['0.5', '0.5']]) {
+      const home = homeResponse();
+      home.data.components[1].config.value = '7';
+      home.data.components[2].config.value = '6';
+      home.data.components[3].config.value = amount;
+      home.data.components.push({ id: 'tabs-plans-v2-available-data-unit-0-0-0', config: { value: 'MB' } });
+      const data = hooks.parseUsage(home);
+      state.texts.length = 0;
+      hooks.createWidget({ data });
+      assert.ok(state.texts.includes(label));
+      assert.ok(state.texts.includes('MB'));
+      assert.ok(state.texts.includes('disponibles de 7.0 GB'));
+      assert.ok(state.texts.includes('86% utilizado'));
+      assert.equal(data.remaining_data, Number(amount.replace(/,/g, '')));
+      assert.equal(data.used_percentage, 85.71);
+    }
+  });
+
+  test(`${design}: old GB cache migrates to explicit values and units`, async () => {
+    const { hooks, state } = await loadWidget(design);
+    state.files.set(CACHE, JSON.stringify({
+      profileId: CREDENTIALS.profileId, fetchedAt: NOW, retryAt: 0,
+      data: { plan_name: 'Old reading', expiration_date: '2026-10-24', days_until: 5,
+        last_updated: '2026-10-18T01:30:00', total_gb: 7, used_gb: 5.4, remaining_gb: 1.6,
+        used_percentage: 77.14, remaining_percentage: 22.86 },
+    }));
+    const result = await hooks.loadUsage(CREDENTIALS);
+    assert.equal(result.data.remaining_data, 1.6);
+    assert.equal(result.data.remaining_unit, 'GB');
+    assert.equal(result.data.total_data, 7);
+    assert.equal(result.data.used_data, 5.4);
+    assert.equal('remaining_gb' in result.data, false);
+    assert.equal(state.requests.length, 0);
+  });
+
+  test(`${design}: total, used and available read their own nested unit`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const [kind, index, field] of [
+      ['total', 1, 'total_data'], ['used', 2, 'used_data'], ['available', 3, 'remaining_data'],
+    ]) {
+      const home = homeResponse();
+      const components = home.data.components;
+      components[index].config.value = '5';
+      const unit = { id: `tabs-plans-v2-${kind}-data-unit-0-0-0`, config: { value: ' mb ' } };
+      components[index] = { type: 'list', children: [components[index], unit] };
+      assert.equal(hooks.parseUsage(home)[field], 5);
+      assert.equal(hooks.parseUsage(home)[field.replace('_data', '_unit')], 'MB');
+      for (const invalid of ['TB', '', null, true]) {
+        unit.config.value = invalid;
+        assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+      }
+    }
+  });
+
+  test(`${design}: available MB are normalized to GB`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const [available, unit, expected] of [
+      ['1,000', 'MB', 1], ['1000', 'MB', 1], [1000, 'MB', 1],
+      ['500', 'MB', 0.5], ['512.5', 'MB', 0.5125], ['5', 'MB', 0.005],
+      ['1', 'MB', 0.001], ['0', 'MB', 0], ['0.5', 'GB', 0.5], ['1', 'GB', 1],
+      ['1,000', 'GB', 1000],
+    ]) {
+      const home = homeResponse();
+      ['Amigo Sin Límite 200', '7', '6', available].forEach((value, i) => {
+        home.data.components[i].config.value = value;
+      });
+      home.data.components.push({
+        id: 'tabs-plans-v2-available-data-unit-0-0-0', config: { value: unit },
+      });
+      const result = hooks.parseUsage(home);
+      assert.equal(result.total_data, 7);
+      assert.equal(result.used_data, 6);
+      assert.equal(result.remaining_data, Number(String(available).replace(/,/g, '')));
+      assert.equal(result.remaining_unit, unit);
+      assert.equal(result.remaining_percentage, Math.round(expected / 7 * 10000) / 100);
+    }
+    for (const value of ['1,00', '1,,000', ',1000', '1,000,', '1,5']) {
+      const home = homeResponse();
+      home.data.components[3].config.value = value;
+      assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+    }
+  });
+
   test(`${design}: cutoff parser recognizes a package expiring today`, async () => {
     const { hooks } = await loadWidget(design);
     for (const corporate of [false, true]) {
@@ -66,7 +151,7 @@ for (const design of ['solid', 'image']) {
       assert.equal(result.plan_name, CORPORATE_PLAN);
       assert.equal(result.expiration_date, expected);
       assert.equal(result.days_until, days);
-      assert.equal(result.remaining_gb, 15);
+      assert.equal(result.remaining_data, 15);
     }
   });
 
@@ -105,7 +190,7 @@ for (const design of ['solid', 'image']) {
     const data = await hooks.fetchUsage(CREDENTIALS);
     assert.deepEqual(plain(data), {
       plan_name: 'Plan 20 GB', expiration_date: '2027-01-02', days_until: 3,
-      last_updated: '2026-12-30T14:35:00', total_gb: 20, used_gb: 5, remaining_gb: 15,
+      last_updated: '2026-12-30T14:35:00', total_data: 20, total_unit: 'GB', used_data: 5, used_unit: 'GB', remaining_data: 15, remaining_unit: 'GB',
       used_percentage: 25, remaining_percentage: 75,
     });
     assert.deepEqual(state.requests.map(r => new URL(r.url).pathname), ['/login', '/security/1.0.0/v2/token', '/api/components/flow/home', '/sso/revoke']);
@@ -147,7 +232,7 @@ for (const design of ['solid', 'image']) {
   test(`${design}: failed logout does not discard successful data`, async () => {
     const queue = fullFlow(); queue[3] = { status: 500, text: 'private-logout-body' };
     const { hooks } = await loadWidget(design, { queue });
-    assert.equal((await hooks.fetchUsage(CREDENTIALS)).remaining_gb, 15);
+    assert.equal((await hooks.fetchUsage(CREDENTIALS)).remaining_data, 15);
   });
 
   test(`${design}: fresh and corrupt cache behavior`, async () => {
@@ -167,7 +252,7 @@ for (const design of ['solid', 'image']) {
     const fetchedAt = NOW - 31 * 60000;
     hooks.writeCache(CREDENTIALS, { data: hooks.SAMPLE_DATA, fetchedAt, retryAt: 0 });
     const result = await hooks.loadUsage(CREDENTIALS);
-    assert.equal(result.data.remaining_gb, 1.6);
+    assert.equal(result.data.remaining_data, 1.6);
     assert.equal(result.updateFailed, true);
     assert.equal(result.refreshAt, NOW + 15 * 60000);
     assert.equal(hooks.readCache(CREDENTIALS).fetchedAt, fetchedAt);
@@ -199,7 +284,7 @@ for (const design of ['solid', 'image']) {
 
   test(`${design}: cache storage failures do not discard readings`, async () => {
     const { hooks } = await loadWidget(design, { writeError: true, queue: fullFlow() });
-    assert.equal((await hooks.loadUsage(CREDENTIALS)).data.remaining_gb, 15);
+    assert.equal((await hooks.loadUsage(CREDENTIALS)).data.remaining_data, 15);
   });
 
   test(`${design}: cache excludes credentials and session tokens`, async () => {
@@ -347,7 +432,7 @@ test('Telcel styles reuse the same Keychain profile and saved reading', async ()
   await first.hooks.loadUsage(CREDENTIALS);
   const second = await loadWidget('image', { keys: first.state.keys, files: first.state.files });
   const result = await second.hooks.loadUsage(second.hooks.readCredentials());
-  assert.equal(result.data.remaining_gb, 15);
+  assert.equal(result.data.remaining_data, 15);
   assert.equal(second.state.requests.length, 0);
 });
 

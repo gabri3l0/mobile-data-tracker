@@ -33,13 +33,17 @@ server/
 ## Current features
 
 - Plan name, expiration, days remaining, and reading timestamp.
-- Total, used, and remaining data in GB, with percentages.
+- Total, used, and remaining data with percentages; Telcel CLI output preserves each carrier unit.
 - CLI and HTTP API backed by the same carrier client.
 - Bait high-speed balances with automatic fallback to throttled data.
 - API keys and usage limits per person.
 - Sanitized API errors; credentials, tokens, and readings are not saved.
 - Diagnostic logs omit credentials, tokens, request URLs, and response bodies.
 - SSO logout attempted after each Telcel reading, including failed requests.
+
+Telcel reads each total, used, and available `data-unit` component. It accepts
+thousands separators such as `1,000` and uses 1000 MB = 1 GB to calculate
+percentages across mixed units. Older responses without unit components default to GB.
 
 ## Limits
 
@@ -101,6 +105,24 @@ The CLI defaults to Telcel when `--carrier` is omitted. It reads the selected
 carrier's settings from `.env` and needs no server API key. API rate limits apply only
 to HTTP requests. Set `LOG_LEVEL=DEBUG` for detailed CLI logs.
 
+Telcel CLI output preserves each reading's value and unit. Its data fields look
+like this (plan details, dates, and percentages are also included):
+
+```json
+{
+  "total_data": 7.0,
+  "total_unit": "GB",
+  "used_data": 6.0,
+  "used_unit": "GB",
+  "remaining_data": 1000.0,
+  "remaining_unit": "MB"
+}
+```
+
+Bait CLI output uses `total_gb`, `used_gb`, and `remaining_gb`. Python callers can
+request Telcel's value-and-unit output with
+`tracker.get_usage_data(preserve_units=True)`; the default returns balances in GB.
+
 ## Endpoints
 
 Local base URL: `http://127.0.0.1:8000`.
@@ -133,7 +155,8 @@ Bait uses the server's service key and does not require a password:
 }
 ```
 
-The response includes plan details, dates, data balances, percentages, and
+The HTTP API returns balances in GB as `total_gb`, `used_gb`, and `remaining_gb`
+for both carriers. The response also includes plan details, dates, percentages, and
 `data_tier` (`high_speed` or `throttled` for Bait, `null` for Telcel).
 `last_updated` is Telcel's carrier reading time, or Bait's request completion time
 in UTC because Bait does not supply a reading timestamp.

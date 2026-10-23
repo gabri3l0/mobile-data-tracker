@@ -246,7 +246,7 @@ test('Bait solid and image share their own cache without reusing Telcel data', a
   const second = await loadBait('image', { keys, files });
   assert.equal((await second.hooks.loadUsage(second.hooks.readCredentials())).data.data_tier, 'high_speed');
   assert.equal(second.state.requests.length, 0);
-  assert.equal(telcel.hooks.readCache(CREDENTIALS).data.remaining_gb, 1.6);
+  assert.equal(telcel.hooks.readCache(CREDENTIALS).data.remaining_data, 1.6);
 });
 
 test('Bait image retains an old background when refreshing fails', async () => {

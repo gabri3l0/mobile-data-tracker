@@ -26,6 +26,7 @@ Haz clic en una captura para abrir el generador con ese operador y diseño selec
 ## Funciones de los widgets
 
 - Datos restantes y barra de consumo.
+- Saldos de Telcel mostrados en MB o GB según la unidad del operador.
 - Nombre del paquete, fecha de vencimiento y días restantes.
 - Datos de tu cuenta guardados en el Keychain de iOS.
 - Temas oscuro, claro y personalizado, con colores de texto y acento.
