@@ -24,6 +24,48 @@ def test_zero_total(home_response):
     assert result["remaining_percentage"] is None
 
 
+@pytest.mark.parametrize("updated,days,expected", [
+    ("22/10/2026", 29, "2026-11-20"),
+    ("30/12/2026", 3, "2027-01-02"),
+    ("28/02/2028", 1, "2028-02-29"),
+    ("22/10/2026", 0, "2026-10-22"),
+])
+def test_corporate_cutoff_without_due_date(home_response, updated, days, expected):
+    components = home_response["data"]["components"]
+    components.pop(5)
+    components[4]["config"]["value"] = f"Información al {updated} 20:08 h"
+    components[-1]["config"]["segments"] = [
+        {"text": "Falta " if days == 1 else "Faltan "},
+        {"text": str(days), "fontWeight": 500},
+        {"text": " días para el próximo corte"},
+    ]
+    response = {"id": "home-corpo", "blocks": {"children": components}}
+    result = parse_usage(response)
+    assert result["expiration_date"] == expected
+    assert result["days_until"] == days
+    assert result["remaining_gb"] == 15
+
+
+def test_noncorporate_missing_due_date_still_fails(home_response):
+    home_response["data"]["components"].pop(5)
+    with pytest.raises(ValueError, match="missing text-due-value"):
+        parse_usage(home_response)
+
+
+@pytest.mark.parametrize("due_config", [None, {}, {"value": "invalid"}])
+def test_corporate_malformed_due_date_still_fails(home_response, due_config):
+    home_response["id"] = "home-corpo"
+    home_response["data"]["components"][5]["config"] = due_config
+    with pytest.raises(ValueError, match="invalid.*text-due-value"):
+        parse_usage(home_response)
+
+
+def test_corporate_explicit_due_date_takes_precedence(home_response):
+    home_response["id"] = "home-corpo"
+    home_response["data"]["components"][5]["config"]["value"] = "5 de enero"
+    assert parse_usage(home_response)["expiration_date"] == "2027-01-05"
+
+
 @pytest.mark.parametrize("prefix,days,suffix", [
     ("Falta ", 1, "día"),
     ("Faltan ", 2, "días"),

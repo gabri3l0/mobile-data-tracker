@@ -6,6 +6,41 @@ const { loadWidget, homeResponse, fullFlow, CREDENTIALS, KEY, CACHE, NOW } = req
 const plain = value => JSON.parse(JSON.stringify(value));
 
 for (const design of ['solid', 'image']) {
+  test(`${design}: corporate cutoff uses carrier reading date when due date is absent`, async () => {
+    const { hooks } = await loadWidget(design);
+    for (const [updated, days, expected] of [
+      ['22/10/2026', 29, '2026-11-20'], ['30/12/2026', 3, '2027-01-02'],
+      ['28/02/2028', 1, '2028-02-29'], ['22/10/2026', 0, '2026-10-22'],
+    ]) {
+      const components = homeResponse().data.components;
+      components.splice(5, 1);
+      components[4].config.value = `Información al ${updated} 20:08 h`;
+      components.at(-1).config.segments = [
+        { text: days === 1 ? 'Falta ' : 'Faltan ' }, { text: String(days), fontWeight: 500 },
+        { text: ' días para el próximo corte' },
+      ];
+      const result = hooks.parseUsage({ id: 'home-corpo', blocks: { children: components } });
+      assert.equal(result.expiration_date, expected);
+      assert.equal(result.days_until, days);
+      assert.equal(result.remaining_gb, 15);
+    }
+  });
+
+  test(`${design}: corporate cutoff preserves explicit dates and rejects malformed dates`, async () => {
+    const { hooks } = await loadWidget(design);
+    const home = homeResponse();
+    home.id = 'home-corpo';
+    home.data.components[5].config.value = '5 de enero';
+    assert.equal(hooks.parseUsage(home).expiration_date, '2027-01-05');
+    for (const config of [undefined, null, {}, { value: 'invalid' }]) {
+      home.data.components[5].config = config;
+      assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+    }
+    delete home.id;
+    home.data.components.splice(5, 1);
+    assert.throws(() => hooks.parseUsage(home), error => error.code === 'usage_data');
+  });
+
   test(`${design}: cutoff parser supports singular, plural and split formatted segments`, async () => {
     const { hooks } = await loadWidget(design);
     for (const [prefix, days, suffix] of [['Falta ', 1, 'día'], ['Faltan ', 2, 'días'], ['Faltan ', 0, 'días'], ['FALTA\u00a0', 1, 'día']]) {
