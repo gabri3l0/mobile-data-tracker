@@ -27,7 +27,10 @@ def main(argv: list[str] | None = None) -> None:
     try:
         tracker = MobileDataTracker(carrier=args.carrier)
         try:
-            print(tracker.get_usage_data())
+            if args.carrier == "telcel":
+                print(tracker.get_usage_data(preserve_units=True))
+            else:
+                print(tracker.get_usage_data())
         finally:
             tracker.close()
     except Exception:

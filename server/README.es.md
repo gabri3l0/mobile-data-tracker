@@ -34,13 +34,17 @@ server/
 ## Funciones actuales
 
 - Nombre del paquete, vencimiento, días restantes y fecha de la lectura.
-- Datos totales, usados y restantes en GB, con porcentajes.
+- Datos totales, usados y restantes con porcentajes; la CLI de Telcel conserva la unidad de cada lectura.
 - CLI y API HTTP que usan el mismo cliente de operadores.
 - Datos de alta velocidad de Bait con cambio automático a datos de velocidad reducida.
 - Claves de API y límites de consumo por persona.
 - Errores de API sin datos sensibles; no se guardan credenciales, tokens ni lecturas.
 - Los logs de diagnóstico omiten credenciales, tokens, URLs de solicitudes y cuerpos de respuesta.
 - Intento de cierre de sesión SSO después de cada consulta de Telcel, incluso si falla.
+
+Telcel lee cada componente `data-unit` de datos totales, usados y disponibles.
+Admite separadores de miles como `1,000` y usa 1000 MB = 1 GB para calcular
+porcentajes con unidades distintas. Las respuestas antiguas sin unidad usan GB.
 
 ## Límites
 
@@ -103,6 +107,24 @@ seleccionado desde `.env` y no necesita una clave de API del servidor. Los lími
 de la API solo aplican a solicitudes HTTP. Usa `LOG_LEVEL=DEBUG` para ver logs
 detallados de la CLI.
 
+La salida de la CLI de Telcel conserva el valor y la unidad de cada lectura.
+Estos son sus campos de datos (también incluye paquete, fechas y porcentajes):
+
+```json
+{
+  "total_data": 7.0,
+  "total_unit": "GB",
+  "used_data": 6.0,
+  "used_unit": "GB",
+  "remaining_data": 1000.0,
+  "remaining_unit": "MB"
+}
+```
+
+La CLI de Bait usa `total_gb`, `used_gb` y `remaining_gb`. Desde Python puedes
+pedir los valores y unidades de Telcel con
+`tracker.get_usage_data(preserve_units=True)`; por defecto devuelve los saldos en GB.
+
 ## Endpoints
 
 URL base local: `http://127.0.0.1:8000`.
@@ -135,7 +157,8 @@ Bait usa la clave de servicio del servidor y no requiere contraseña:
 }
 ```
 
-La respuesta incluye los detalles del paquete, fechas, datos disponibles,
+La API HTTP devuelve los saldos de ambos operadores en GB mediante `total_gb`,
+`used_gb` y `remaining_gb`. También incluye los detalles del paquete, fechas,
 porcentajes y `data_tier` (`high_speed` o `throttled` para Bait, `null` para Telcel).
 `last_updated` es la hora de la lectura del operador en Telcel, o la hora de
 finalización de la consulta en UTC en Bait, porque Bait no proporciona una fecha

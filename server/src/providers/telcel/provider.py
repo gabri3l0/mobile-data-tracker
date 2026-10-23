@@ -138,11 +138,14 @@ class TelcelProvider:
         logger.info("Telcel home data retrieved successfully.")
         return response
 
-    def get_usage_data(self) -> UsageData:
+    def get_usage_data(self, *, preserve_units: bool = False) -> UsageData | dict[str, object]:
         login_token = self.login()
         try:
             access_token = self.get_access_token(login_token=login_token)
-            return parse_usage(self.get_home(access_token=access_token))
+            response = self.get_home(access_token=access_token)
+            if preserve_units:
+                return parse_usage(response, preserve_units=True)
+            return parse_usage(response)
         finally:
             self.revoke_session(login_token=login_token)
 

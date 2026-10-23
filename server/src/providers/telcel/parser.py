@@ -7,7 +7,9 @@ from src.models import UsageData
 logger = logging.getLogger(__name__)
 
 
-def parse_usage(response: dict[str, object]) -> UsageData:
+def parse_usage(
+    response: dict[str, object], *, preserve_units: bool = False,
+) -> UsageData | dict[str, object]:
     """Extract plan usage from the nested JSON returned by get_home."""
     logger.debug("Parsing Telcel home response.")
     if not isinstance(response, dict):
@@ -45,7 +47,12 @@ def parse_usage(response: dict[str, object]) -> UsageData:
 
     def number(component_id: str) -> float:
         try:
-            return float(get(component_id))
+            text = get(component_id).strip()
+            if "," in text:
+                if not re.fullmatch(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?", text):
+                    raise ValueError
+                text = text.replace(",", "")
+            return float(text)
         except ValueError:
             logger.error("Carrier home response has an invalid number for %s.", component_id)
             raise ValueError(
@@ -56,9 +63,24 @@ def parse_usage(response: dict[str, object]) -> UsageData:
         "text-plan-name" if response.get("id") == "home-corpo"
         else "tabs-plans-v2-plan-name-0-0-0"
     )
-    total = number("tabs-plans-v2-total-data-value-0-0-0")
-    used = number("tabs-plans-v2-used-data-value-0-0-0")
-    remaining = number("tabs-plans-v2-available-data-value-0-0-0")
+    readings: dict[str, tuple[float, str]] = {}
+
+    def data_gb(kind: str) -> float:
+        amount = number(f"tabs-plans-v2-{kind}-data-value-0-0-0")
+        unit_id = f"tabs-plans-v2-{kind}-data-unit-0-0-0"
+        # Preserve compatibility with older responses that omit unit components.
+        unit = "GB" if find(response, unit_id) is None else get(unit_id).strip().upper()
+        readings[kind] = (amount, unit)
+        if unit == "MB":
+            return amount / 1000
+        if unit == "GB":
+            return amount
+        logger.error("Carrier home response has an invalid unit for %s.", unit_id)
+        raise ValueError(f"Carrier home response has an invalid unit for {unit_id}.")
+
+    total = data_gb("total")
+    used = data_gb("used")
+    remaining = data_gb("available")
 
     updated = get("last-update-text")
     try:
@@ -119,4 +141,12 @@ def parse_usage(response: dict[str, object]) -> UsageData:
         "remaining_percentage": round(remaining / total * 100, 2) if total else None,
     }
     logger.debug("Carrier usage parsed successfully.")
+    if preserve_units:
+        result: dict[str, object] = dict(usage)
+        for field, kind in (("total", "total"), ("used", "used"), ("remaining", "available")):
+            amount, unit = readings[kind]
+            result.pop(f"{field}_gb")
+            result[f"{field}_data"] = amount
+            result[f"{field}_unit"] = unit
+        return result
     return usage
