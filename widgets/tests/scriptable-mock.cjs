@@ -8,6 +8,7 @@ const CREDENTIALS = { phone: '5512345678', password: 'private password+ñ', prof
 const BAIT_KEY = 'mobile-data-tracker.bait.credentials.v1';
 const BAIT_CACHE = '/library/mobile-data-tracker-bait-usage-v1.json';
 const BAIT_CREDENTIALS = { phone: '5598765432', profileId: 'bait-profile' };
+const RELEASE_VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, '../version.json'), 'utf8')).version;
 const NOW = Date.UTC(2026, 9, 20, 21, 38);
 
 function homeResponse() {
@@ -45,7 +46,7 @@ async function loadWidget(design, options = {}) {
   source = source.replace(/\nawait main\(\);\s*$/, '');
   const state = {
     now: NOW, keys: new Map(), files: new Map(), queue: [], alerts: [], prompts: [],
-    requests: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
+    requests: [], versionRequests: [], versionQueue: [], openedURLs: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
     writeError: false, removeError: false, keyWriteError: false,
     ...options,
   };
@@ -99,9 +100,11 @@ async function loadWidget(design, options = {}) {
   class Request {
     constructor(url) { this.url = url; this.method = 'GET'; this.headers = {}; }
     async reply(kind) {
-      state.requests.push({ url: this.url, method: this.method, headers: this.headers,
+      const isVersion = this.url === 'https://gabri3l0.github.io/mobile-data-tracker/widgets/version.json';
+      const requests = isVersion ? state.versionRequests : state.requests;
+      requests.push({ url: this.url, method: this.method, headers: this.headers,
         body: this.body, timeout: this.timeoutInterval, kind });
-      const next = state.queue.shift();
+      const next = isVersion ? (state.versionQueue.shift() || { body: { version: RELEASE_VERSION } }) : state.queue.shift();
       if (!next) throw new Error('Unexpected mocked request');
       if (next.error) throw next.error;
       if (next.advance) state.now += next.advance;
@@ -165,6 +168,7 @@ async function loadWidget(design, options = {}) {
         state.keys.set(name, value);
       },
     },
+    Safari: { open: url => state.openedURLs.push(url) },
     FileManager: { local: () => files }, Alert, Request, ListWidget, Size, Rect, Color, Point, Path, DrawContext,
     Font: { systemFont: size => ({ size }), boldSystemFont: size => ({ size }), mediumSystemFont: size => ({ size }) },
     Data: {
@@ -175,6 +179,7 @@ async function loadWidget(design, options = {}) {
     console: { log: value => state.logs.push(value) },
   });
   const hooks = await new vm.Script(`(async () => {\n${source}\nreturn {
+    WIDGET_VERSION, VERSION_CACHE_FILE, checkForUpdate, newerVersion, updateURL,
     SETTINGS, SAMPLE_DATA, KEYCHAIN_KEY, CACHE_FILE, readCredentials, configureCredentials,
     credentialsForRun, parseUsage, isUsageData, loadUsage, fetchUsage, readCache, writeCache,
     retryDeadline, createWidget, main, COLORS, drawProgressBar, drawProgressArc,

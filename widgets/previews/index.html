@@ -106,8 +106,8 @@
 <body>
   <main>
     <div class="eyebrow">Mobile Data Tracker</div>
-    <h1>Crea tu widget</h1>
-    <p class="intro">Elige tu operador y fondo, genera el código y pégalo en Scriptable.<br>La vista usa datos de ejemplo. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain.</p>
+    <h1 id="page-title">Crea tu widget</h1>
+    <p class="intro" id="page-intro">Elige tu operador y fondo, genera el código y pégalo en Scriptable.<br>La vista usa datos de ejemplo. Configura tu cuenta en Scriptable; tus datos se guardan en Keychain.</p>
     <div class="builder">
       <aside class="control-panel" aria-label="Personaliza tu widget">
         <div class="controls">
@@ -139,7 +139,7 @@
         </details>
     <details>
       <summary>Opciones avanzadas</summary>
-      <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+      <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="update">Nueva versión disponible</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
     <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
     </details>
       </aside>
@@ -171,7 +171,7 @@
     </div>
     <section class="code-section" aria-labelledby="code-title">
       <h2 id="code-title">Llévalo a Scriptable</h2>
-      <p class="intro">Genera tu script completo. Cópialo en un nuevo script de Scriptable y ejecútalo con ▶ para guardar tu cuenta. Después, agrega un widget pequeño de Scriptable a tu pantalla de inicio y selecciona ese script.</p>
+      <p class="intro">Genera tu script completo y pégalo en Scriptable. Para actualizar, reemplaza el código del script existente; tu cuenta guardada se conserva. Si es tu primera instalación, ejecútalo con ▶ para configurar tu cuenta y selecciona el script en un widget pequeño de Scriptable.</p>
       <div class="actions"><button id="generate-code" type="button">Generar código</button><button id="copy-code" type="button" disabled>Copiar código</button><button id="download-code" type="button" disabled>Descargar .js</button></div>
       <p class="status" id="code-status" role="status" aria-live="polite"></p>
       <label id="code-output" hidden>Código completo<textarea id="code" rows="12" readonly spellcheck="false"></textarea></label>
@@ -197,7 +197,6 @@ const SAMPLES = {
     used_percentage: 32.64, remaining_percentage: 67.36, data_tier: "high_speed",
   },
 };
-const sources = new Map();
 let appliedImageUrl = "";
 let backgroundReady = false;
 let revision = 0;
@@ -373,7 +372,8 @@ function render() {
   const [, month, day] = data.expiration_date.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
-  $("warning").hidden = state !== "stale";
+  $("warning").hidden = !["stale", "update"].includes(state);
+  $("warning").textContent = state === "update" ? "Nueva versión disponible" : "No se pudo actualizar";
 }
 function setDesign() {
   document.body.classList.toggle("image-design", imageDesign());
@@ -423,25 +423,22 @@ async function generateCode() {
   $("generate-code").disabled = true;
   $("code-status").textContent = "Cargando el script…";
   try {
-    let source = sources.get(key);
-    if (!source) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      try {
-        const response = await fetch(`../${key}.js`, { cache: "no-cache", credentials: "omit", signal: controller.signal });
-        if (!response.ok) throw new Error("Script unavailable");
-        source = await response.text();
-      } finally { clearTimeout(timeout); }
-    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let source;
+    try {
+      const response = await fetch(`../${key}.js`, { cache: "no-cache", credentials: "omit", signal: controller.signal });
+      if (!response.ok) throw new Error("Script unavailable");
+      source = await response.text();
+    } finally { clearTimeout(timeout); }
     const code = buildWidgetSource(source, appearance);
-    sources.set(key, source);
     if (currentRevision !== revision) return;
     generated = { code, filename: `${carrier}-${design}.js` };
     $("code").value = code;
     $("code-output").hidden = false;
     $("copy-code").disabled = false;
     $("download-code").disabled = false;
-    $("code-status").textContent = "Código listo. Cópialo completo en un nuevo script de Scriptable y ejecútalo para configurar tu cuenta.";
+    $("code-status").textContent = "Código listo. Para actualizar, reemplaza todo el código del script existente en Scriptable. Si es nuevo, ejecútalo para configurar tu cuenta.";
   } catch {
     if (currentRevision === revision) $("code-status").textContent = "No se pudo cargar el script. Revisa tu conexión e intenta generar de nuevo.";
   } finally {
@@ -501,9 +498,18 @@ $("generate-code").addEventListener("click", generateCode);
 $("copy-code").addEventListener("click", copyCode);
 $("download-code").addEventListener("click", downloadCode);
 const params = new URLSearchParams(window.location.search);
+if (params.get("update") === "1") {
+  $("page-title").textContent = "Nueva versión disponible";
+  $("page-intro").textContent = "Tus colores y ajustes ya están cargados. Genera el código de nuevo, cópialo completo y pégalo en tu script existente de Scriptable para incluir los últimos cambios. Tu cuenta guardada se conserva.";
+  $("code-title").textContent = "Actualiza tu widget en Scriptable";
+}
+const appearanceParams = new URLSearchParams((window.location.hash || "").slice(1));
+for (const key of ["theme", "hex", "primary", "secondary", "accent", "chart", "plan", "image", "overlay"]) {
+  if (appearanceParams.has(key)) params.set(key, appearanceParams.get(key));
+}
 if (["telcel", "bait"].includes(params.get("carrier"))) $("carrier").value = params.get("carrier");
 if (["solid", "image"].includes(params.get("design"))) $("design").value = params.get("design");
-if (["success", "stale", "error", "setup", "throttled"].includes(params.get("state"))) $("state").value = params.get("state");
+if (["success", "stale", "error", "setup", "update", "throttled"].includes(params.get("state"))) $("state").value = params.get("state");
 if (params.has("image")) $("image-url").value = params.get("image");
 const opacity = params.get("overlay");
 if (opacity !== null && opacity.trim() && Number.isFinite(Number(opacity))) $("opacity").value = String(Math.max(0, Math.min(1, Number(opacity))));

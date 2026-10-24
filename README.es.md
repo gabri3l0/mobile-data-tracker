@@ -33,6 +33,7 @@ Haz clic en una captura para abrir el generador con ese operador y diseño selec
 - Fondos sólidos o con imagen e indicadores de barra, arco o sin gráfico.
 - Lecturas guardadas disponibles si falla la actualización.
 - Una fecha y hora que indica cuándo se ejecutó el script por última vez.
+- Avisos de nuevas versiones con enlace al generador del widget correspondiente.
 
 ## Servidor central opcional
 

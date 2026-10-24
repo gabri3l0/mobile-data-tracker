@@ -34,6 +34,7 @@ Click a screenshot to open the generator with that carrier and design selected.
 - Solid or image backgrounds with bar, semicircle, or chart-free layouts.
 - Saved readings available when updates fail.
 - One timestamp showing when the script last ran.
+- New-release notices with a link to the matching widget generator.
 
 ## Optional central server
 

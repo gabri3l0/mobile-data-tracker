@@ -2,6 +2,9 @@
 // icon-color: yellow; icon-glyph: signal;
 
 const RUN_AT = new Date();
+const WIDGET_VERSION = "1.0.0";
+const WIDGET_CARRIER = "bait";
+const WIDGET_DESIGN = "solid";
 // Customize the settings below. Guide: widgets/README.md#customize
 // Enter account details when running the script; they are saved in Keychain.
 const SETTINGS = {
@@ -16,7 +19,7 @@ const SETTINGS = {
   requestTimeoutSeconds: 20,
   debug: false, // Safe request, cache, and failure logs in Scriptable.
   useSampleData: false,
-  sampleState: "success", // success, stale, error, setup, throttled.
+  sampleState: "success", // success, stale, error, setup, update, throttled.
 };
 const CLIENT_AUTH = "NTdiZmIyNjczNWFhNGVjM2ExYmFhZmE4NjQwMDZkN2Q=";
 const CARRIER_NAME = "Bait";
@@ -39,6 +42,75 @@ const SAMPLE_DATA = {
   used_gb: 6690 / 1024, remaining_gb: 13805 / 1024,
   used_percentage: 32.64, remaining_percentage: 67.36, data_tier: "high_speed",
 };
+
+// Shared across all carriers and styles; independent of account and usage caches.
+const VERSION_CACHE_FILE = "mobile-data-tracker-version-v1.json";
+const VERSION_URL = "https://gabri3l0.github.io/mobile-data-tracker/widgets/version.json";
+
+function updateURL() {
+  const appearance = {
+    theme: "custom", hex: COLORS.background, primary: COLORS.text,
+    secondary: COLORS.muted, accent: COLORS.accent,
+    chart: chartStyle(), plan: String(SETTINGS.showPlanName !== false),
+  };
+  if (WIDGET_DESIGN === "image") {
+    appearance.image = SETTINGS.backgroundImageUrl || "";
+    appearance.overlay = String(Math.max(0, Math.min(1, SETTINGS.backgroundOverlayOpacity)));
+  }
+  // Keep appearance (including image URLs) in the fragment, separate from the page request.
+  const params = Object.entries(appearance)
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&");
+  return `https://gabri3l0.github.io/mobile-data-tracker/widgets/previews/?carrier=${WIDGET_CARRIER}&design=${WIDGET_DESIGN}&update=1#${params}`;
+}
+
+function versionParts(version) {
+  if (typeof version !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) return null;
+  const parts = version.split(".").map(Number);
+  return parts.every(Number.isSafeInteger) ? parts : null;
+}
+
+function newerVersion(latest, installed = WIDGET_VERSION) {
+  const a = versionParts(latest), b = versionParts(installed);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  const now = Date.now();
+  let files, path, cache = null;
+  try {
+    files = FileManager.local();
+    path = files.joinPath(files.libraryDirectory(), VERSION_CACHE_FILE);
+    if (files.fileExists(path)) {
+      const saved = JSON.parse(files.readString(path));
+      if (saved && (saved.latestVersion === null || versionParts(saved.latestVersion))
+        && Number.isFinite(saved.checkedAt) && saved.checkedAt >= 0 && saved.checkedAt <= now
+        && Number.isFinite(saved.nextCheckAt) && saved.nextCheckAt >= saved.checkedAt
+        && saved.nextCheckAt <= saved.checkedAt + 86400000) cache = saved;
+    }
+  } catch { /* Version metadata is optional. */ }
+  if (cache && cache.nextCheckAt > now) return newerVersion(cache.latestVersion);
+  let latestVersion = cache ? cache.latestVersion : null;
+  let interval = 3600000;
+  try {
+    const request = new Request(VERSION_URL);
+    request.timeoutInterval = 3;
+    request.headers = { Accept: "application/json", "Cache-Control": "no-cache" };
+    const body = await request.loadString();
+    if (request.response.statusCode !== 200) throw new Error("Version unavailable");
+    const metadata = JSON.parse(body);
+    if (!metadata || !versionParts(metadata.version)) throw new Error("Invalid version");
+    latestVersion = metadata.version;
+    interval = 86400000;
+  } catch { /* Keep the last known version and retry in one hour. */ }
+  try {
+    if (files && path) files.writeString(path, JSON.stringify({ latestVersion, checkedAt: now, nextCheckAt: now + interval }));
+  } catch { /* Cache failures must not affect the widget. */ }
+  return newerVersion(latestVersion);
+}
 
 const KEYCHAIN_KEY = "mobile-data-tracker.bait.credentials.v1";
 const CACHE_FILE = "mobile-data-tracker-bait-usage-v1.json";
@@ -116,8 +188,13 @@ async function credentialsForRun() {
     menu.title = "Mi Bait";
     menu.addAction("Ver widget");
     menu.addAction("Cambiar datos");
+    menu.addAction("Obtener nueva versión");
     menu.addCancelAction("Cancelar");
     const action = await menu.presentSheet();
+    if (action === 2) {
+      Safari.open(updateURL());
+      return { credentials: existing, cancelled: true };
+    }
     if (action === 0) return { credentials: existing, cancelled: false };
     if (action !== 1) return { credentials: existing, cancelled: true };
   }
@@ -399,8 +476,18 @@ function addText(stack, value, font, color) {
   return text;
 }
 
-function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) {
+function addStatusNotice(widget, updateFailed, updateAvailable) {
+  if (!updateFailed && !updateAvailable) return;
+  const message = updateAvailable
+    ? (updateFailed ? "Error · Nueva versión" : "Nueva versión disponible")
+    : "No se pudo actualizar";
+  widget.addSpacer(3);
+  addText(widget, message, Font.systemFont(8), COLORS.warning);
+}
+
+function createWidget({ data, updateFailed, setupRequired = false, refreshAt, updateAvailable = false }) {
   const widget = new ListWidget();
+  if (updateAvailable) widget.url = updateURL();
   // iOS decides the actual refresh time; this is only the earliest requested time.
   if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
   widget.backgroundColor = new Color(COLORS.background);
@@ -422,6 +509,7 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
     widget.addSpacer(5);
     addText(widget, setupRequired ? "Abre Scriptable para configurar" : "Intenta más tarde", Font.systemFont(11), COLORS.muted);
     widget.addSpacer();
+    addStatusNotice(widget, updateFailed, updateAvailable);
     addExecutionTime(widget);
     return widget;
   }
@@ -478,10 +566,7 @@ function createWidget({ data, updateFailed, setupRequired = false, refreshAt }) 
   if (data.expiration_date !== null) {
     addText(widget, `Vence ${formatExpiration(data.expiration_date)} · en ${data.days_until} días`, Font.systemFont(9), COLORS.muted);
   }
-  if (updateFailed) {
-    widget.addSpacer(3);
-    addText(widget, "No se pudo actualizar", Font.systemFont(8), COLORS.warning);
-  }
+  addStatusNotice(widget, updateFailed, updateAvailable);
   addExecutionTime(widget);
   return widget;
 }
@@ -499,6 +584,7 @@ async function main() {
         } : SAMPLE_DATA,
       updateFailed: SETTINGS.sampleState === "stale" || SETTINGS.sampleState === "error",
       setupRequired: SETTINGS.sampleState === "setup",
+      updateAvailable: SETTINGS.sampleState === "update",
     };
   } else {
     const { credentials, cancelled } = await credentialsForRun();
@@ -508,7 +594,11 @@ async function main() {
       return;
     }
     if (!credentials) debugLog("Configuración de cuenta pendiente.");
-    result = credentials ? await loadUsage(credentials) : { data: null, setupRequired: true };
+    const [usage, updateAvailable] = await Promise.all([
+      credentials ? loadUsage(credentials) : Promise.resolve({ data: null, setupRequired: true }),
+      checkForUpdate(),
+    ]);
+    result = { ...usage, updateAvailable };
   }
   const widget = createWidget(result);
   Script.setWidget(widget);
