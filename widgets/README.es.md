@@ -26,8 +26,9 @@ ni computadora. Android aún no es compatible.
 
 Los datos de tu cuenta se guardan en el **Keychain de iOS**. Los dos diseños
 comparten una cuenta por operador. Para cambiarla, ejecuta el script y elige
-**Cambiar datos**. Al ejecutarlo manualmente verás **Ver widget**, **Cambiar datos**
-y **Cancelar**; las actualizaciones automáticas en la pantalla de inicio no muestran menú.
+**Cambiar datos**. Al ejecutarlo manualmente verás **Ver widget**, **Cambiar datos**,
+**Obtener nueva versión** y **Cancelar**; las actualizaciones automáticas en la
+pantalla de inicio no muestran menú.
 
 Telcel conserva la unidad de cada lectura: un saldo de `1,000 MB` se muestra
 como `1,000 MB` y los saldos en GB permanecen en GB. Los porcentajes usan una
@@ -60,6 +61,53 @@ Las ejecuciones simultáneas aún pueden generar solicitudes duplicadas.
 **Última ejecución** indica cuándo se ejecutó el script, incluso si usó datos
 guardados o falló. Si no hay una lectura guardada y falla la consulta, muestra un
 error. Las imágenes de fondo se guardan por separado durante 24 horas.
+
+## Actualizaciones del widget
+
+Los cuatro scripts comparten una versión de lanzamiento incluida en el código.
+Al ejecutarse, consultan el [archivo público de versión](version.json) como máximo
+cada **24 horas**. La caché local se comparte entre diseños y operadores y está
+separada de la cuenta y del consumo. La consulta no envía datos de tu cuenta.
+iOS decide cuándo ejecutar el widget; el aviso puede aparecer después de las
+24 horas siguientes a una publicación.
+
+Si hay una versión más reciente, aparece **Nueva versión disponible**. Toca el
+widget para abrir el generador con tu operador, diseño y apariencia restaurados, o ejecuta
+el script en Scriptable y elige **Obtener nueva versión**. Si también falló la
+consulta de consumo, aparece **Error · Nueva versión**. Sin una actualización,
+el toque conserva su comportamiento habitual.
+
+Genera y copia el código nuevo y reemplaza todo el script existente en Scriptable.
+Se conservan la cuenta en Keychain y las lecturas compatibles guardadas. El
+enlace incluye los colores de fondo, texto principal/secundario y acento, el tipo
+de gráfico y la visibilidad del paquete. En los diseños con imagen también
+incluye su URL y opacidad. La apariencia se codifica en el fragmento de la URL
+(`#…`); nunca se incluyen datos de tu cuenta. Puedes ajustar los valores
+restaurados antes de generar el código.
+Los scripts anteriores sin esta función requieren una actualización manual inicial.
+
+Si falla la consulta de versión, se conserva el último estado conocido sin avisos
+de error y se reintenta en la siguiente ejecución después de **una hora**. Esto no
+modifica los tiempos de consulta ni de reintento del operador. La solicitud de
+versión tiene un tiempo de espera separado de 3 segundos. El modo de ejemplo
+omite estas consultas; usa `sampleState: "update"` o el estado de ejemplo
+**Nueva versión disponible** del generador para ver el aviso.
+
+## Publicar una versión del widget
+
+1. Elige una versión `major.minor.patch` superior, a partir de `1.0.0`; no se admiten
+   sufijos de versiones preliminares. Cambiar solo documentación no requiere incrementarla.
+2. Actualiza `widgets/version.json` y `WIDGET_VERSION` en los cuatro scripts
+   independientes con la misma versión. Conserva la URL del archivo de versión.
+3. Ejecuta `node --test widgets/tests/*.test.cjs` desde la raíz del repositorio.
+   Las pruebas verifican que el archivo de versión coincida con los cuatro scripts.
+4. Publica los scripts, el archivo de versión y el generador juntos en el mismo
+   despliegue de GitHub Pages. Confirma que `/widgets/version.json` y los scripts
+   descargados desde el generador contienen la versión nueva antes de anunciarla.
+
+El generador consulta el código actualizado cada vez que generas un script.
+No se reemplaza el script automáticamente ni se envían notificaciones push;
+tampoco se necesita el servidor Python.
 
 ## Depuración
 
@@ -97,7 +145,7 @@ La [vista previa y generador](https://gabri3l0.github.io/mobile-data-tracker/wid
 Para desarrollar localmente, ejecuta `python3 -m http.server 8080` desde la raíz del repositorio y abre `http://localhost:8080/widgets/previews/`. Abrir `index.html` directamente permite ver la vista previa, pero para generar código necesitas HTTP o la página publicada.
 
 Para probar datos de ejemplo en Scriptable, activa `useSampleData: true`. Elige
-`sampleState`: `success`, `stale`, `error` o `setup`; Bait también admite `throttled`
+`sampleState`: `success`, `stale`, `error`, `setup` o `update`; Bait también admite `throttled`
 para los datos de velocidad reducida. Vuelve a poner `useSampleData: false` para
 consultar tu consumo real.
 
@@ -107,6 +155,7 @@ consultar tu consumo real.
 widgets/
 ├── telcel/       Scripts independientes de Telcel: solid.js e image.js
 ├── bait/         Scripts independientes de Bait: solid.js e image.js
+├── version.json  Versión publicada compartida por los widgets
 ├── previews/     Una vista HTML con generador de código
 ├── screenshots/  Imágenes de los widgets para la documentación
 ├── tests/        Pruebas con Scriptable simulado y respuestas de ejemplo

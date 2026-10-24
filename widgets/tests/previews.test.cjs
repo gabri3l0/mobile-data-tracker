@@ -5,6 +5,88 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { loadWidget } = require('./scriptable-mock.cjs');
 
+test('update links restore appearance and export the same settings in all four scripts', async () => {
+  const imageURL = 'https://images.example/niño + photo.jpg?token=a+b&size=large#crop';
+  for (const carrier of ['telcel', 'bait']) {
+    for (const design of ['solid', 'image']) {
+      const settings = {
+        backgroundHex: '123456', textPrimaryHex: 'ABCDEF', textSecondaryHex: '112233',
+        accentHex: '445566', chartStyle: 'arc', showPlanName: false,
+        backgroundImageUrl: imageURL, backgroundOverlayOpacity: 0.35,
+      };
+      const { hooks } = await loadWidget(design, { carrier, settings });
+      const link = new URL(hooks.updateURL());
+      assert.equal(link.origin, 'https://gabri3l0.github.io');
+      assert.equal(link.pathname, '/mobile-data-tracker/widgets/previews/');
+      assert.equal(link.searchParams.get('carrier'), carrier);
+      assert.equal(link.searchParams.get('design'), design);
+      assert.equal(link.searchParams.get('update'), '1');
+      assert.equal(link.searchParams.has('image'), false);
+      const fragment = new URLSearchParams(link.hash.slice(1));
+      assert.equal(fragment.get('image'), design === 'image' ? imageURL : null);
+      assert.deepEqual([...fragment.keys()].sort(), (design === 'image'
+        ? ['theme', 'hex', 'primary', 'secondary', 'accent', 'chart', 'plan', 'image', 'overlay']
+        : ['theme', 'hex', 'primary', 'secondary', 'accent', 'chart', 'plan']).sort());
+      const { elements: el } = preview(link.href);
+      assert.equal(el['page-title'].textContent, 'Nueva versión disponible');
+      assert.match(el['page-intro'].textContent, /Genera el código de nuevo/);
+      assert.match(el['page-intro'].textContent, /script existente de Scriptable/);
+      assert.equal(el['code-title'].textContent, 'Actualiza tu widget en Scriptable');
+      assert.equal(el.theme.value, 'custom');
+      assert.equal(el.hex.value, settings.backgroundHex);
+      assert.equal(el['primary-hex'].value, settings.textPrimaryHex);
+      assert.equal(el['secondary-hex'].value, settings.textSecondaryHex);
+      assert.equal(el['accent-hex'].value, settings.accentHex);
+      assert.equal(el['chart-style'].value, 'arc');
+      assert.equal(el['show-plan'].checked, false);
+      await el['generate-code'].emit('click');
+      const exported = exportedSettings(el.code.value);
+      for (const key of ['backgroundHex', 'textPrimaryHex', 'textSecondaryHex', 'accentHex', 'chartStyle', 'showPlanName']) {
+        assert.equal(exported[key], settings[key]);
+      }
+      if (design === 'image') {
+        assert.equal(el['image-url'].value, imageURL);
+        assert.equal(exported.backgroundImageUrl, imageURL);
+        assert.equal(exported.backgroundOverlayOpacity, 0.35);
+      }
+    }
+  }
+});
+
+test('an explicitly empty background image survives an update link', async () => {
+  const { hooks } = await loadWidget('image', { settings: { backgroundImageUrl: '', showPlanName: true } });
+  const { elements: el } = preview(hooks.updateURL());
+  assert.equal(el['image-url'].value, '');
+  assert.equal(el['show-plan'].checked, true);
+  await el['generate-code'].emit('click');
+  assert.equal(exportedSettings(el.code.value).backgroundImageUrl, '');
+});
+
+test('an update preview shows the notice and preserves the carrier selection', () => {
+  for (const carrier of ['telcel', 'bait']) {
+    for (const design of ['solid', 'image']) {
+      const { elements: el } = preview(`?carrier=${carrier}&design=${design}&state=update`);
+      assert.equal(el.carrier.value, carrier);
+      assert.equal(el.design.value, design);
+      assert.equal(el.warning.hidden, false);
+      assert.equal(el.warning.textContent, 'Nueva versión disponible');
+      assert.equal(el.usage.hidden, false);
+    }
+  }
+});
+
+test('regenerating code in an open tab retrieves the newly published script', async () => {
+  let calls = 0;
+  const { elements: el } = preview('', { fetch: async () => ({
+    ok: true, text: async () => sourceFor('telcel', 'solid')
+      .replace(/const WIDGET_VERSION = "[^"]+";/, `const WIDGET_VERSION = "0.0.${++calls}";`),
+  }) });
+  await el['generate-code'].emit('click');
+  assert.match(el.code.value, /WIDGET_VERSION = "0.0.1"/);
+  await el['generate-code'].emit('click');
+  assert.match(el.code.value, /WIDGET_VERSION = "0.0.2"/);
+});
+
 function sourceFor(carrier, design) {
   return fs.readFileSync(path.join(__dirname, '..', carrier, `${design}.js`), 'utf8')
     .replace(/const CLIENT_AUTH = "[^"]+";/, 'const CLIENT_AUTH = "test-client-auth";');
@@ -14,6 +96,7 @@ function classes() {
   return { toggle(key, enabled) { enabled ? values.add(key) : values.delete(key); }, contains(key) { return values.has(key); } };
 }
 function preview(search = '', options = {}) {
+  const location = new URL(search, 'https://example.com/widgets/previews/');
   const html = fs.readFileSync(path.join(__dirname, '../previews/index.html'), 'utf8');
   const elements = {};
   const state = { requests: [], images: [], copied: [], downloads: [], blobs: [] };
@@ -50,7 +133,7 @@ function preview(search = '', options = {}) {
       body: { classList: classes(), appendChild() {} }, getElementById: id => elements[id],
       createElement() { return { click() { state.downloads.push({ href: this.href, filename: this.download }); }, remove() {} }; },
     },
-    window: { location: { search, protocol: options.protocol || 'http:' }, innerWidth: options.width || 1000 },
+    window: { location: { search: location.search, hash: location.hash, protocol: options.protocol || 'http:' }, innerWidth: options.width || 1000 },
     URL: BrowserURL, URLSearchParams, Blob, AbortController, setTimeout: () => 1, clearTimeout() {},
     navigator: { clipboard: { async writeText(value) { if (options.copyError) throw new Error(); state.copied.push(value); } } },
     async fetch(url, settings) {
@@ -179,7 +262,7 @@ test('invalid colors preserve the applied preview and prevent stale exports', as
   assert.equal(el.hex.value, '123456');
   await el['generate-code'].emit('click');
   assert.equal(exportedSettings(el.code.value).backgroundHex, '123456');
-  assert.equal(state.requests.length, 1, 'Canonical source reused, with new appearance settings');
+  assert.equal(state.requests.length, 2, 'Each generation fetches fresh canonical source');
   el.carrier.value = 'bait'; el.carrier.emit('change');
   assert.equal(el.code.value, '');
   assert.equal(el['download-code'].disabled, true);

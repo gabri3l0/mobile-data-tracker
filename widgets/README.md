@@ -27,7 +27,8 @@ Not sure how to edit the code? Use the **[widget generator](https://gabri3l0.git
 
 Your account details are stored in **iOS Keychain**. Both designs share one account
 per carrier. To change it, run the script and choose **Cambiar datos**.
-Manual runs show **Ver widget**, **Cambiar datos**, and **Cancelar**; automatic
+Manual runs show **Ver widget**, **Cambiar datos**, **Obtener nueva versión**,
+and **Cancelar**; automatic
 home-screen updates show no menu.
 
 Telcel preserves each reading’s carrier unit: a remaining balance of `1,000 MB`
@@ -60,6 +61,50 @@ make duplicate requests.
 **Última ejecución** shows when the script ran, even when it used cached data or
 failed. If there is no saved reading and the request fails, it shows an error.
 Image backgrounds are cached separately for 24 hours.
+
+## Widget updates
+
+All four scripts share a release version embedded in their code. On execution,
+they check the public [version file](version.json) at most once every **24 hours**,
+using a shared local cache separate from your account and usage data. Checks send
+no account information. iOS decides when the widget runs, so notices may appear
+later than 24 hours after a release.
+
+When a newer version exists, the widget shows **Nueva versión disponible**.
+Tap the widget to open the generator with your carrier, design, and current
+appearance settings restored, or
+run the script in Scriptable and choose **Obtener nueva versión**. If the usage
+lookup also failed, the notice reads **Error · Nueva versión**. Without an update,
+tapping keeps its usual behavior.
+
+Generate and copy the new code, then replace the entire existing Scriptable
+script. Your Keychain account and compatible cached readings remain available.
+The link carries background, primary/secondary text, and accent colors, chart
+style, plan-name visibility, and (for image designs) the image URL and overlay
+opacity. Appearance values are encoded in the URL fragment (`#…`); account
+details are never included. You can adjust the restored settings before generating.
+Older scripts without this feature need one manual update to start checking.
+
+A failed version check stays silent, keeps the last known update status, and
+retries on the next execution after **one hour**. It does not change carrier
+refresh or retry times. Update checks use a separate 3-second request timeout.
+Sample mode skips version checks; use `sampleState: "update"` or the generator's
+**Nueva versión disponible** example state to preview the notice.
+
+## Publishing a widget release
+
+1. Choose a higher `major.minor.patch` version, starting from `1.0.0`; prerelease
+   suffixes are not supported. Documentation-only changes need no version bump.
+2. Update `widgets/version.json` and `WIDGET_VERSION` in all four standalone
+   scripts to that same version. Keep the manifest's URL stable.
+3. Run `node --test widgets/tests/*.test.cjs` from the repository root. The suite
+   checks that the manifest and all four scripts agree.
+4. Publish the scripts, manifest, and generator together in the same GitHub Pages
+   deployment. Confirm `/widgets/version.json` and generator script downloads
+   contain the new version before announcing the release.
+
+The generator fetches fresh script text on every code-generation action. There
+is no automatic script replacement, push notification, or Python server dependency.
 
 ## Debug
 
@@ -97,7 +142,7 @@ The [preview and generator](https://gabri3l0.github.io/mobile-data-tracker/widge
 For local development, serve the repository with `python3 -m http.server 8080` from its root and open `http://localhost:8080/widgets/previews/`. Opening `index.html` directly supports the preview, but code generation needs HTTP or the hosted page.
 
 To try sample data inside Scriptable, set `useSampleData: true`. Choose
-`sampleState`: `success`, `stale`, `error`, or `setup`; Bait also supports
+`sampleState`: `success`, `stale`, `error`, `setup`, or `update`; Bait also supports
 `throttled` for reduced-speed data. Set `useSampleData` back to `false` for live usage.
 
 ## Folder structure
@@ -106,6 +151,7 @@ To try sample data inside Scriptable, set `useSampleData: true`. Choose
 widgets/
 ├── telcel/       Standalone Telcel scripts: solid.js and image.js
 ├── bait/         Standalone Bait scripts: solid.js and image.js
+├── version.json  Shared published widget release version
 ├── previews/     One HTML preview and code generator
 ├── screenshots/  Widget images for documentation
 ├── tests/        Mocked Scriptable tests and response fixtures
