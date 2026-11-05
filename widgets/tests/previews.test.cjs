@@ -186,6 +186,7 @@ for (const design of ['solid', 'image']) {
       assert.equal(el['code-output'].hidden, false);
       const code = el.code.value;
       const settings = exportedSettings(code);
+      assert.equal(settings.cacheMinutes, 30);
       assert.equal(settings.backgroundHex, '123456');
       assert.equal(settings.useSampleData, false);
       assert.equal(settings.debug, false);

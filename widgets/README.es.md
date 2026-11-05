@@ -42,21 +42,25 @@ y las lecturas anteriores en GB; una consulta nueva obtiene la unidad MB/GB actu
 
 ## Cómo se actualiza
 
-El consumo se guarda en un archivo JSON local durante **30 minutos**. Si falla
-una consulta, se conserva la lectura anterior y se pausan las solicitudes durante
+**iOS decide cuándo ejecutar el widget.** El script no establece una hora de
+actualización. El consumo se guarda localmente y se reutiliza durante **30 minutos** sin
+consultar al operador. Si falla una consulta, se conserva la lectura anterior,
+aunque tenga más de 30 minutos, y se pausan las solicitudes durante
 **15 minutos**. Si el operador limita las solicitudes e indica cuánto esperar,
 el widget respeta ese tiempo.
 
 | Ejemplo | Resultado |
 | --- | --- |
 | Primera ejecución a las 10:00 | Consulta al operador y guarda la lectura. |
-| Otra ejecución a las 10:05 | Usa los datos guardados; no consulta al operador. |
-| Ejecución a las 10:31 | Consulta al operador porque venció la caché. |
-| La consulta falla a las 10:31 | Muestra los datos guardados con un aviso; permite otro intento después de las 10:46. |
+| iOS vuelve a ejecutarlo a las 10:10 | Usa los datos guardados; no consulta al operador. |
+| iOS vuelve a ejecutarlo a las 10:30 | Consulta al operador porque venció la caché. |
+| La consulta falla a las 10:30 | Muestra los datos guardados con un aviso; permite otro intento después de las 10:45. |
 
-El reintento ocurre en la siguiente ejecución después de la espera. **iOS decide
-cuándo actualizar**, por lo que no se garantiza una consulta exacta cada 30 minutos.
-Las ejecuciones simultáneas aún pueden generar solicitudes duplicadas.
+Los 30 minutos se cuentan desde la última consulta exitosa, no desde la última
+vez que se usó la caché. Su vencimiento no inicia solicitudes: las consultas y los
+reintentos ocurren cuando iOS vuelve a ejecutar el widget (o lo ejecutas manualmente),
+respetando las pausas de reintento. Las ejecuciones simultáneas aún pueden generar
+solicitudes duplicadas.
 
 **Última ejecución** indica cuándo se ejecutó el script, incluso si usó datos
 guardados o falló. Si no hay una lectura guardada y falla la consulta, muestra un

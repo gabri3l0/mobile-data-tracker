@@ -363,11 +363,11 @@ async function loadUsage(credentials) {
   const cache = readCache(credentials);
   if (cache && cache.retryAt > now) {
     debugLog(`Actualización en pausa: faltan ${Math.ceil((cache.retryAt - now) / 60000)} min.`);
-    return { data: cache.data, updateFailed: true, refreshAt: cache.retryAt };
+    return { data: cache.data, updateFailed: true };
   }
   if (cache && cache.data && now - cache.fetchedAt < SETTINGS.cacheMinutes * 60000) {
     debugLog(`Usando lectura guardada: ${Math.floor((now - cache.fetchedAt) / 60000)} min de antigüedad.`);
-    return { data: cache.data, updateFailed: false, refreshAt: cache.fetchedAt + SETTINGS.cacheMinutes * 60000 };
+    return { data: cache.data, updateFailed: false };
   }
   debugLog(cache && cache.data ? "Lectura vencida: consultar operador." : "Sin lectura guardada: consultar operador.");
   try {
@@ -375,7 +375,7 @@ async function loadUsage(credentials) {
     debugLog("Lectura recibida y validada.");
     const fetchedAt = Date.now();
     writeCache(credentials, { data, fetchedAt, retryAt: 0 });
-    return { data, updateFailed: false, refreshAt: fetchedAt + SETTINGS.cacheMinutes * 60000 };
+    return { data, updateFailed: false };
   } catch (error) {
     const data = cache ? cache.data : null;
     const retryAt = error.retryAt || Date.now() + SETTINGS.retryMinutes * 60000;
@@ -383,7 +383,7 @@ async function loadUsage(credentials) {
     debugLog(`No se pudo actualizar: ${diagnosticError(error.code || "unknown").code}.`);
     debugLog(data ? "Mostrando lectura anterior." : "Sin lectura disponible.");
     debugLog(`Próximo intento permitido en ${Math.ceil((retryAt - Date.now()) / 60000)} min.`);
-    return { data, updateFailed: true, refreshAt: retryAt };
+    return { data, updateFailed: true };
   }
 }
 
@@ -551,11 +551,9 @@ function addStatusNotice(widget, updateFailed, updateAvailable) {
   addText(widget, message, Font.systemFont(8), COLORS.warning);
 }
 
-function createWidget({ data, updateFailed, setupRequired = false, refreshAt, updateAvailable = false }) {
+function createWidget({ data, updateFailed, setupRequired = false, updateAvailable = false }) {
   const widget = new ListWidget();
   if (updateAvailable) widget.url = updateURL();
-  // iOS decides the actual refresh time; this is only the earliest requested time.
-  if (refreshAt) widget.refreshAfterDate = new Date(refreshAt);
   widget.backgroundColor = new Color(COLORS.background);
   widget.setPadding(12, 12, 12, 12);
   const header = widget.addStack();

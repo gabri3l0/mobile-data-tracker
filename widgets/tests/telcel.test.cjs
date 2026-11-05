@@ -239,11 +239,29 @@ for (const design of ['solid', 'image']) {
     const { hooks, state } = await loadWidget(design);
     hooks.writeCache(CREDENTIALS, { data: hooks.SAMPLE_DATA, fetchedAt: NOW - 60000, retryAt: 0 });
     const result = await hooks.loadUsage(CREDENTIALS);
-    assert.equal(result.refreshAt, NOW - 60000 + 30 * 60000);
+    assert.equal(result.refreshAt, undefined);
     assert.equal(state.requests.length, 0);
+    state.now = NOW + 9 * 60000;
+    await hooks.loadUsage(CREDENTIALS);
+    assert.equal(state.requests.length, 0, 'An iOS run after 10 minutes uses the original cache');
+    assert.equal(hooks.readCache(CREDENTIALS).fetchedAt, NOW - 60000);
+    state.now = NOW - 60000 + 30 * 60000 - 1;
+    await hooks.loadUsage(CREDENTIALS);
+    assert.equal(state.requests.length, 0, 'Reuse saved usage until just before 30 minutes');
+    state.now++;
+    state.queue.push(...fullFlow());
+    const refreshed = await hooks.loadUsage(CREDENTIALS);
+    assert.equal(state.requests.length, 4, 'Fetch at exactly 30 minutes');
+    assert.equal(refreshed.updateFailed, false);
+    assert.equal(hooks.readCache(CREDENTIALS).fetchedAt, state.now);
+    state.now += 30 * 60000;
+    state.queue.push(...fullFlow());
+    await hooks.loadUsage(CREDENTIALS);
+    assert.equal(state.requests.length, 8, 'An iOS run after 30 minutes fetches fresh usage');
+    assert.equal(hooks.readCache(CREDENTIALS).fetchedAt, state.now);
     state.files.set(CACHE, 'not-json');
     assert.equal(hooks.readCache(CREDENTIALS), null);
-    hooks.writeCache(CREDENTIALS, { data: hooks.SAMPLE_DATA, fetchedAt: NOW + 1, retryAt: 0 });
+    hooks.writeCache(CREDENTIALS, { data: hooks.SAMPLE_DATA, fetchedAt: state.now + 1, retryAt: 0 });
     assert.equal(hooks.readCache(CREDENTIALS), null);
   });
 
@@ -254,7 +272,7 @@ for (const design of ['solid', 'image']) {
     const result = await hooks.loadUsage(CREDENTIALS);
     assert.equal(result.data.remaining_data, 1.6);
     assert.equal(result.updateFailed, true);
-    assert.equal(result.refreshAt, NOW + 15 * 60000);
+    assert.equal(hooks.readCache(CREDENTIALS).retryAt, NOW + 15 * 60000);
     assert.equal(hooks.readCache(CREDENTIALS).fetchedAt, fetchedAt);
     await hooks.loadUsage(CREDENTIALS);
     assert.equal(state.requests.length, 1);
@@ -272,7 +290,8 @@ for (const design of ['solid', 'image']) {
   for (const header of ['1200', new Date(NOW + 1200000).toUTCString()]) {
     test(`${design}: respects Retry-After ${header.startsWith('1200') ? 'seconds' : 'date'}`, async () => {
       const { hooks, state } = await loadWidget(design, { queue: [{ status: 429, headers: { 'rEtRy-AfTeR': header }, text: '' }, ...fullFlow()] });
-      assert.equal((await hooks.loadUsage(CREDENTIALS)).refreshAt, NOW + 1200000);
+      await hooks.loadUsage(CREDENTIALS);
+      assert.equal(hooks.readCache(CREDENTIALS).retryAt, NOW + 1200000);
       state.now = NOW + 1199999;
       await hooks.loadUsage(CREDENTIALS);
       assert.equal(state.requests.length, 1);
@@ -313,7 +332,7 @@ for (const design of ['solid', 'image']) {
     assert.ok(state.texts.includes('15.0'));
     assert.ok(state.texts.some(value => value.startsWith('Última ejecución · ')));
     assert.equal(state.widget.backgroundColor.hex, '101012');
-    assert.ok(state.widget.refreshAfterDate.getTime() > NOW);
+    assert.equal(state.widget.refreshAfterDate, undefined);
   });
 
   test(`${design}: first run saves credentials with a secure password field`, async () => {

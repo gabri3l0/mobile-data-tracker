@@ -155,7 +155,25 @@ for (const design of ['solid', 'image']) {
     assert.equal(state.requests.length, 0);
     assert.equal(state.prompts.length, 0);
     assert.ok(state.texts.includes('13.5'));
-    assert.equal(state.widget.refreshAfterDate.getTime(), NOW + 30 * 60000);
+    assert.equal(state.widget.refreshAfterDate, undefined);
+    state.now = NOW + 10 * 60000;
+    await hooks.loadUsage(BAIT_CREDENTIALS);
+    assert.equal(state.requests.length, 0, 'An iOS run after 10 minutes uses the original cache');
+    assert.equal(hooks.readCache(BAIT_CREDENTIALS).fetchedAt, NOW);
+    state.now = NOW + 30 * 60000 - 1;
+    await hooks.loadUsage(BAIT_CREDENTIALS);
+    assert.equal(state.requests.length, 0, 'Reuse saved usage until just before 30 minutes');
+    state.now++;
+    state.queue.push({ body: response() });
+    const refreshed = await hooks.loadUsage(BAIT_CREDENTIALS);
+    assert.equal(state.requests.length, 1, 'Fetch at exactly 30 minutes');
+    assert.equal(refreshed.updateFailed, false);
+    assert.equal(hooks.readCache(BAIT_CREDENTIALS).fetchedAt, state.now);
+    state.now += 30 * 60000;
+    state.queue.push({ body: response() });
+    await hooks.loadUsage(BAIT_CREDENTIALS);
+    assert.equal(state.requests.length, 2, 'An iOS run after 30 minutes fetches fresh usage');
+    assert.equal(hooks.readCache(BAIT_CREDENTIALS).fetchedAt, state.now);
   });
 
   test(`${design} Bait: cache and diagnostic logs omit phone, key, and raw response`, async () => {
@@ -173,7 +191,7 @@ for (const design of ['solid', 'image']) {
     const result = await hooks.loadUsage(BAIT_CREDENTIALS);
     assert.equal(result.data.remaining_gb, 13805 / 1024);
     assert.equal(result.updateFailed, true);
-    assert.equal(result.refreshAt, NOW + 15 * 60000);
+    assert.equal(hooks.readCache(BAIT_CREDENTIALS).retryAt, NOW + 15 * 60000);
     assert.equal(hooks.readCache(BAIT_CREDENTIALS).fetchedAt, fetchedAt);
     await hooks.loadUsage(BAIT_CREDENTIALS);
     assert.equal(state.requests.length, 1);
@@ -183,7 +201,7 @@ for (const design of ['solid', 'image']) {
     const { hooks, state } = await loadBait(design, { queue: [{ status: 429, headers: { 'Retry-After': '1200' }, text: 'private-body' }] });
     const result = await hooks.loadUsage(BAIT_CREDENTIALS);
     assert.equal(result.data, null);
-    assert.equal(result.refreshAt, NOW + 1200000);
+    assert.equal(hooks.readCache(BAIT_CREDENTIALS).retryAt, NOW + 1200000);
     assert.equal(state.files.get(BAIT_CACHE).includes('private-body'), false);
     assert.equal(state.logs.join('\n').includes('private-body'), false);
   });
