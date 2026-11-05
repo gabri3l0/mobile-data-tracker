@@ -6,7 +6,7 @@ DataTier = Literal["high_speed", "throttled"]
 
 
 class UsageData(TypedDict):
-    """Normalized usage; last_updated is carrier reading time, or fetch time if unavailable."""
+    """Normalized usage; last_updated is carrier reading time, or fetch time if unavailable"""
 
     plan_name: str
     expiration_date: str
