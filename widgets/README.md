@@ -43,24 +43,40 @@ remain usable; a fresh carrier reading supplies the current MB/GB unit.
 
 ## Refresh behavior
 
-Usage is saved in a local JSON file for **30 minutes**. A failed lookup keeps the
-previous reading and pauses requests for **15 minutes**. If the carrier responds
+**iOS decides when to execute the widget.** The script does not set a refresh
+time. Usage is saved locally and reused for **30 minutes** without contacting the
+carrier. A failed lookup keeps the previous reading, even if it is older than
+30 minutes, and pauses requests for **15 minutes**. If the carrier responds
 with a rate limit, the widget follows its retry time when provided.
 
 | Example | Result |
 | --- | --- |
 | First run at 10:00 | Calls the carrier and saves the reading. |
-| Run again at 10:05 | Uses saved data; no carrier call. |
-| Run at 10:31 | Calls the carrier again because the cache expired. |
-| Request fails at 10:31 | Shows saved data with a warning; allows another attempt after 10:46. |
+| iOS runs it again at 10:10 | Uses saved data; no carrier call. |
+| iOS runs it again at 10:30 | Calls the carrier again because the cache expired. |
+| Request fails at 10:30 | Shows saved data with a warning; allows another attempt after 10:45. |
 
-Retries happen on the next execution after the wait. **iOS controls refresh timing**,
-so a call exactly every 30 minutes is not guaranteed. Simultaneous runs can still
-make duplicate requests.
+The 30-minute window is measured from the last successful fetch, not from the
+last use of cached data. Expiration does not launch a request: fetching and
+retries happen only when iOS next executes the widget (or you run it manually),
+subject to retry waits. Simultaneous runs can still make duplicate requests.
 
 **Última ejecución** shows when the script ran, even when it used cached data or
 failed. If there is no saved reading and the request fails, it shows an error.
 Image backgrounds are cached separately for 24 hours.
+
+## Telcel authentication
+
+When fresh Telcel usage is needed, the widget downloads the login page and its
+linked application JavaScript to discover `MTL_AUTHORIZATION_BASIC`. It reads the
+configuration as text without executing the downloaded code. Each discovery
+request has a 5-second timeout and stays on Telcel's HTTPS origin.
+
+Discovery runs once per live fetch, with no separate Basic-auth cache. If it
+fails, the embedded value is used as a fallback. A usage-cache hit skips discovery,
+login, and usage requests. The login → token exchange → usage → SSO logout flow
+is preserved, including logout after exchange or usage failures. Rejected token
+exchanges are not automatically retried. Bait authentication is unchanged.
 
 ## Widget updates
 

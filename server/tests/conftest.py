@@ -14,9 +14,18 @@ from src.providers.telcel.provider import TelcelProvider
 @pytest.fixture
 def carrier(monkeypatch):
     """Provide a carrier backed entirely by an in-memory HTTP transport."""
-    state = SimpleNamespace(requests=[], payload={}, status=200, content=None, payloads=[])
+    state = SimpleNamespace(requests=[], discovery_requests=[], discovery_responses=[],
+                            payload={}, status=200, content=None, payloads=[])
 
     def respond(request):
+        if request.url.path == "/mitelcel/login" or request.url.path.startswith("/assets/"):
+            state.discovery_requests.append(request)
+            if not state.discovery_responses:
+                return httpx.Response(404)
+            result = state.discovery_responses.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
         state.requests.append(request)
         if state.content is not None:
             return httpx.Response(state.status, content=state.content)

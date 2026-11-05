@@ -102,6 +102,7 @@ for (const carrier of ['telcel', 'bait']) {
             for (const updateAvailable of [false, true]) {
               state.texts.length = 0;
               const widget = hooks.createWidget({ data, updateFailed, updateAvailable, setupRequired: data === null });
+              assert.equal(widget.refreshAfterDate, undefined, 'Leave refresh scheduling to iOS in every state');
               assert.equal(widget.url, updateAvailable ? hooks.updateURL() : undefined);
               const message = updateAvailable ? (updateFailed ? 'Error · Nueva versión' : 'Nueva versión disponible')
                 : updateFailed ? 'No se pudo actualizar' : null;
@@ -141,7 +142,7 @@ for (const carrier of ['telcel', 'bait']) {
       hooks.writeCache(credentials, { data: hooks.SAMPLE_DATA, fetchedAt: NOW, retryAt: 0 });
       await hooks.main();
       assert.equal(state.widget.url, undefined);
-      assert.equal(state.widget.refreshAfterDate.getTime(), NOW + 30 * 60000);
+      assert.equal(state.widget.refreshAfterDate, undefined);
       assert.equal(state.texts.includes('No se pudo actualizar'), false);
       assert.equal(state.texts.includes('Nueva versión disponible'), false);
       assert.equal(state.requests.length, 0);
