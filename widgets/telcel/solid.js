@@ -22,6 +22,7 @@ const SETTINGS = {
   sampleState: "success", // success, stale, error, setup, update.
 };
 const CLIENT_AUTH = "YlhSd2MyVnlkbWxqWlhNNk55UTROM0ptUm5OM1pTUXlNVjg9";
+const WEB_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const CARRIER_NAME = "Telcel";
 const COLORS = {
   get background() { return appearanceHex(SETTINGS.backgroundHex, "101012"); },
@@ -365,7 +366,13 @@ async function fetchUsage(credentials) {
   debugLog("Inicio de sesión.");
   const login = await requestJson("https://wbl.telcel-id.com:8443/login", "login", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      Origin: "https://wbl.telcel-id.com:8443",
+      Referer: "https://wbl.telcel-id.com:8443/login?sitedomain=https://www.mitelcel.com&CCode=52&Type=MSISDN&Invocation=iFrame",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "User-Agent": WEB_USER_AGENT,
+    },
     body: formBody({
       username: credentials.phone,
       "telcel-pass": credentials.password,
@@ -380,6 +387,8 @@ async function fetchUsage(credentials) {
     const tokens = await requestJson(`https://mi-telcel.smapps.mx/security/1.0.0/v2/token?user=${encodeURIComponent(credentials.phone)}&token=${encodeURIComponent(login.token)}`, "token", {
       headers: {
         Authorization: `Basic ${basicAuth}`,
+        Accept: "application/json", "Content-Type": "application/json",
+        tipoRequest: "1", "User-Agent": "ktor-client",
         "app-version": "0.14", "code-version": "38", "device-id": "DSK",
         os: "WEB", "os-version": "13", scope: "token:mit|token:b2f", "x-channel": "web-browser",
       },
@@ -388,7 +397,13 @@ async function fetchUsage(credentials) {
     const access = Array.isArray(entries) ? entries.find(entry => entry && entry.id === "token:b2f") : null;
     if (tokens.message !== "Éxito." || !access || typeof access.access_token !== "string" || !access.access_token.trim()) throw diagnosticError("token_missing");
     const response = await requestJson(`https://api.journeys.telcel.wavebybemobi.com/api/components/flow/home?externalCode=${encodeURIComponent(credentials.phone)}`, "usage", {
-      headers: { Authorization: `Bearer ${access.access_token}` },
+      headers: {
+        Authorization: `Bearer ${access.access_token}`,
+        Accept: "application/json", "Content-Type": "application/json",
+        "X-Is-iPad": "false", "x-wave-sdk": "WEB", "x-wave-device": "iPhone",
+        "x-wave-device-type": "mobile", "x-wave-os": "iOS-web",
+        "x-wave-os-version": "18.0", "User-Agent": WEB_USER_AGENT,
+      },
     });
     return parseUsage(response);
   } finally {
@@ -456,8 +471,28 @@ function parseUsage(response) {
   const total = toGB(totalReading);
   const used = toGB(usedReading);
   const remaining = toGB(remainingReading);
-  const updated = value("last-update-text").replace("Información al ", "").replace(" h", "").trim();
-  const parts = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(updated);
+  const legacyId = ["last-update-text", "last-update-text-web"].find(id => find(response, id) !== undefined);
+  let parts;
+  let seconds = "00";
+  if (legacyId) {
+    const updated = value(legacyId).replace("Información al ", "").replace(" h", "").trim();
+    parts = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(updated);
+  } else {
+    const chartId = ["tabs-plans-v2-usage-chart-0-0-0", "tabs-plans-v2-usage-chart-web-0-0-0"].find(id => find(response, id) !== undefined);
+    if (!chartId) throw diagnosticError("usage_data");
+    const entries = component(chartId).data;
+    const available = Array.isArray(entries) && entries.find(entry => entry && entry.key === "available");
+    const timestamp = available && available.updatedAt;
+    if (typeof timestamp !== "string" || !/T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(timestamp)) throw diagnosticError("usage_data");
+    const instant = new Date(timestamp);
+    if (!Number.isFinite(instant.getTime())) throw diagnosticError("usage_data");
+    const fields = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+    }).formatToParts(instant).map(part => [part.type, part.value]));
+    parts = [null, fields.day, fields.month, fields.year, fields.hour, fields.minute];
+    seconds = fields.second;
+  }
   if (!parts || Number(parts[4]) > 23 || Number(parts[5]) > 59) throw diagnosticError("usage_data");
   const year = Number(parts[3]);
   const readingDate = date(year, Number(parts[2]), Number(parts[1]));
@@ -481,7 +516,7 @@ function parseUsage(response) {
   }
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: daysUntil,
-    last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`,
+    last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${seconds}`,
     total_data: totalReading.amount, total_unit: totalReading.unit,
     used_data: usedReading.amount, used_unit: usedReading.unit,
     remaining_data: remainingReading.amount, remaining_unit: remainingReading.unit,

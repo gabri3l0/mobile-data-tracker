@@ -12,6 +12,11 @@ from src.providers.telcel.web_auth import extract_basic_auth, find_bundle, same_
 
 logger = logging.getLogger(__name__)
 
+WEB_USER_AGENT = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+)
+
 
 class TelcelProvider:
     """Own Telcel authentication, retrieval, and usage normalization."""
@@ -63,7 +68,16 @@ class TelcelProvider:
             site_domain=config.site_domain,
             login_url=config.login_url,
         )
-        response = self._request("POST", config.login_url, follow_redirects=True, data={
+        response = self._request("POST", config.login_url, follow_redirects=True, headers={
+            "Origin": "https://wbl.telcel-id.com:8443",
+            "Referer": (
+                "https://wbl.telcel-id.com:8443/login?"
+                "sitedomain=https://www.mitelcel.com&CCode=52&Type=MSISDN&Invocation=iFrame"
+            ),
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": WEB_USER_AGENT,
+        }, data={
             "username": config.username,
             base64.b64decode("dGVsY2VsLXBhc3M=").decode("ascii"): config.password,
             "pB64": base64.b64encode(config.password.encode("utf-8")).decode("ascii"),
@@ -130,6 +144,10 @@ class TelcelProvider:
             params={"user": config.username, "token": login_token},
             headers={
                 "Authorization": f"Basic {basic_auth}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "tipoRequest": "1",
+                "User-Agent": "ktor-client",
                 "app-version": "0.14",
                 "code-version": "38",
                 "device-id": "DSK",
@@ -169,7 +187,18 @@ class TelcelProvider:
         response = self._request(
             "GET", config.home_url,
             params={"externalCode": config.username},
-            headers={"Authorization": f"Bearer {access_token}"},
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-Is-iPad": "false",
+                "x-wave-sdk": "WEB",
+                "x-wave-device": "iPhone",
+                "x-wave-device-type": "mobile",
+                "x-wave-os": "iOS-web",
+                "x-wave-os-version": "18.0",
+                "User-Agent": WEB_USER_AGENT,
+            },
         )
         logger.info("Telcel home data retrieved successfully.")
         return response
