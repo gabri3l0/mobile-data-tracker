@@ -93,18 +93,66 @@ Sample mode skips version checks; use `sampleState: "update"` or the generator's
 
 ## Publishing a widget release
 
-1. Choose a higher `major.minor.patch` version, starting from `1.0.0`; prerelease
-   suffixes are not supported. Documentation-only changes need no version bump.
-2. Update `widgets/version.json` and `WIDGET_VERSION` in all four standalone
-   scripts to that same version. Keep the manifest's URL stable.
-3. Run `node --test widgets/tests/*.test.cjs` from the repository root. The suite
-   checks that the manifest and all four scripts agree.
-4. Publish the scripts, manifest, and generator together in the same GitHub Pages
-   deployment. Confirm `/widgets/version.json` and generator script downloads
-   contain the new version before announcing the release.
+After the one-time setup, merging production widget changes into `main` starts
+the **Widget release** workflow. It increments the shared patch version
+(`1.0.0` → `1.0.1`), commits the five version values, tests that commit, deploys
+GitHub Pages, verifies the public scripts and manifest, and publishes a stable
+GitHub Release with generated change notes. PR titles retain their original
+language; the release headings and update instructions are in Spanish.
 
-The generator fetches fresh script text on every code-generation action. There
-is no automatic script replacement, push notification, or Python server dependency.
+Documentation, test, and workflow changes alone do not increment the widget
+version. Changes to production JS, HTML, CSS, or JSON under `widgets/` do.
+Unreleased changes are compared with the latest stable release, so a subsequent
+run can finish an interrupted release. An already prepared higher version is
+reused, and published releases are never overwritten or retagged.
+
+### One-time setup
+
+1. Merge the automation PR into `main`. Keep the existing `1.0.0` version for
+   this setup; the initial release already exists.
+2. In **Settings → Pages → Build and deployment → Source**, choose
+   **GitHub Actions** instead of branch publishing.
+3. Allow the workflow to write repository contents. It uses `GITHUB_TOKEN` to
+   push the version commit directly to `main`; branch protection or repository
+   policies must permit that push. No personal access token is needed.
+4. In **Actions → Widget release → Run workflow**, select `main` to verify
+   deployment. This does not duplicate the existing `v1.0.0` release.
+
+### Normal workflow
+
+1. Make your widget changes on a branch and create a PR.
+2. Wait for validation, review, and merge into `main`.
+3. Check **Actions → Widget release** for the version commit, successful Pages
+   deployment, and release link. Installed widgets discover the version on their
+   next eligible check; iOS still controls when they execute.
+
+If a run fails, resolve the reported problem and rerun the workflow on the latest
+`main`. A failed test, build, deployment, or public-file verification prevents
+release publication. The automatic version commit does not trigger another
+workflow; the current run tests and deploys that exact commit. Deployment runs
+are serialized, and stale runs stop instead of overwriting newer main commits.
+
+### Local helper and validation
+
+Node.js 22 is used in CI. From the repository root:
+
+```sh
+node scripts/release.cjs check
+node scripts/release.cjs next
+node --test scripts/tests/*.test.cjs widgets/tests/*.test.cjs
+```
+
+`release.cjs` edits and validates version files. `release-automation.cjs` handles
+GitHub version commits, deployment verification, and release publication; it is
+invoked by Actions rather than run manually for normal releases.
+
+For an intentional minor or major release, run
+`node scripts/release.cjs prepare 1.1.0` before creating the PR. It updates the
+manifest and all four scripts together; it never commits or pushes. Versions must
+be higher `major.minor.patch` numbers without prerelease suffixes.
+
+The Python server version is separate. The generator fetches fresh scripts on
+every generation; installed scripts still require manual replacement.
 
 ## Debug
 
