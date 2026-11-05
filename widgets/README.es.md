@@ -95,19 +95,68 @@ omite estas consultas; usa `sampleState: "update"` o el estado de ejemplo
 
 ## Publicar una versión del widget
 
-1. Elige una versión `major.minor.patch` superior, a partir de `1.0.0`; no se admiten
-   sufijos de versiones preliminares. Cambiar solo documentación no requiere incrementarla.
-2. Actualiza `widgets/version.json` y `WIDGET_VERSION` en los cuatro scripts
-   independientes con la misma versión. Conserva la URL del archivo de versión.
-3. Ejecuta `node --test widgets/tests/*.test.cjs` desde la raíz del repositorio.
-   Las pruebas verifican que el archivo de versión coincida con los cuatro scripts.
-4. Publica los scripts, el archivo de versión y el generador juntos en el mismo
-   despliegue de GitHub Pages. Confirma que `/widgets/version.json` y los scripts
-   descargados desde el generador contienen la versión nueva antes de anunciarla.
+Después de la configuración inicial, al fusionar cambios del widget en `main`
+se ejecuta **Widget release**. El flujo incrementa la versión patch compartida
+(`1.0.0` → `1.0.1`), guarda las cinco versiones en un commit, prueba ese commit,
+despliega GitHub Pages, verifica los archivos públicos y publica un GitHub
+Release estable con notas generadas a partir de los PR. Los títulos de los PR
+conservan su idioma original; los encabezados y las instrucciones están en español.
 
-El generador consulta el código actualizado cada vez que generas un script.
-No se reemplaza el script automáticamente ni se envían notificaciones push;
-tampoco se necesita el servidor Python.
+Cambiar solo documentación, pruebas o workflows no incrementa la versión del
+widget. Los cambios de JS, HTML, CSS o JSON de producción dentro de `widgets/`
+sí la incrementan. Los cambios se comparan con el último lanzamiento estable,
+para poder completar una publicación interrumpida. Si ya se preparó una versión
+superior, se reutiliza. Nunca se sobrescriben lanzamientos ni se mueven sus tags.
+
+### Configuración inicial
+
+1. Fusiona el PR de automatización en `main`. Conserva `1.0.0` para esta
+   configuración; el primer lanzamiento ya existe.
+2. En **Settings → Pages → Build and deployment → Source**, selecciona
+   **GitHub Actions** en lugar de publicar desde una rama.
+3. Permite que el workflow escriba en el repositorio. Usa `GITHUB_TOKEN` para
+   subir el commit de versión directamente a `main`; la protección de ramas y
+   las políticas del repositorio deben permitirlo. No se necesita un token personal.
+4. En **Actions → Widget release → Run workflow**, selecciona `main` para
+   verificar el despliegue. Esto no duplica el lanzamiento `v1.0.0` existente.
+
+### Flujo habitual
+
+1. Realiza los cambios del widget en una rama y crea un PR.
+2. Espera la validación, revisa el PR y fusiónalo en `main`.
+3. Revisa **Actions → Widget release** para confirmar el commit de versión,
+   el despliegue de Pages y el enlace al lanzamiento. Los widgets instalados
+   detectan la versión en su siguiente consulta elegible; iOS decide cuándo ejecutarlos.
+
+Si falla una ejecución, resuelve el problema indicado y vuelve a ejecutar el
+workflow sobre el último `main`. Un fallo de pruebas, compilación, despliegue o
+verificación pública impide publicar el Release. El commit automático no dispara
+otro workflow: la ejecución actual prueba y despliega ese mismo commit. Los
+despliegues se ejecutan en serie y las ejecuciones antiguas se detienen para no
+sobrescribir commits más recientes de main.
+
+### Herramienta local y validación
+
+CI usa Node.js 22. Desde la raíz del repositorio:
+
+```sh
+node scripts/release.cjs check
+node scripts/release.cjs next
+node --test scripts/tests/*.test.cjs widgets/tests/*.test.cjs
+```
+
+`release.cjs` edita y valida los archivos de versión. `release-automation.cjs`
+se encarga de los commits de versión en GitHub, la verificación del despliegue y
+la publicación del Release; Actions lo ejecuta sin intervención manual para los
+lanzamientos habituales.
+
+Para preparar una versión minor o major intencionalmente, ejecuta
+`node scripts/release.cjs prepare 1.1.0` antes de crear el PR. Actualiza el
+archivo de versión y los cuatro scripts juntos, sin crear commits ni subirlos.
+La versión debe ser `major.minor.patch`, superior a la actual y sin sufijos preliminares.
+
+La versión del servidor Python es independiente. El generador obtiene código
+actualizado cada vez; el usuario sigue reemplazando manualmente su script instalado.
 
 ## Depuración
 
