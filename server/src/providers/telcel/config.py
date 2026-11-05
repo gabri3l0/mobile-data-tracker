@@ -6,7 +6,7 @@ from dataclasses import dataclass
 class TelcelConfig:
     username: str = ""
     password: str = ""
-    basic_auth: str = ""
+    basic_auth: str = ""  # Optional fallback when web-client discovery is unavailable.
     site_domain: str = "https://www.mitelcel.com"
     scope: str = "token:mit|token:b2f"
     login_url: str = "https://wbl.telcel-id.com:8443/login"

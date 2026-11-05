@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from src.models import UsageData
 
@@ -82,15 +83,49 @@ def parse_usage(
     used = data_gb("used")
     remaining = data_gb("available")
 
-    updated = get("last-update-text")
-    try:
-        last_updated = datetime.strptime(
-            updated.replace("Información al ", "").replace(" h", "").strip(),
-            "%d/%m/%Y %H:%M"
-        )
-    except ValueError:
-        logger.error("Carrier home response has an invalid last-update-text date.")
-        raise ValueError("Carrier home response has an invalid last-update-text date.") from None
+    updated_id = "last-update-text"
+    if find(response, updated_id) is None and find(response, "last-update-text-web") is not None:
+        updated_id = "last-update-text-web"
+
+    if find(response, updated_id) is not None:
+        updated = get(updated_id)
+        try:
+            last_updated = datetime.strptime(
+                updated.replace("Información al ", "").replace(" h", "").strip(),
+                "%d/%m/%Y %H:%M"
+            )
+        except ValueError:
+            logger.error("Carrier home response has an invalid %s date.", updated_id)
+            raise ValueError(f"Carrier home response has an invalid {updated_id} date.") from None
+    else:
+        # New responses use a relative sync label; the chart retains the reading time.
+        chart_id = "tabs-plans-v2-usage-chart-0-0-0"
+        if find(response, chart_id) is None:
+            chart_id = "tabs-plans-v2-usage-chart-web-0-0-0"
+        chart = find(response, chart_id)
+        if chart is None:
+            raise ValueError("Carrier home response is missing last-update-text and usage chart timestamp.")
+        try:
+            entries = chart.get("data") if isinstance(chart, dict) else None
+            if not isinstance(entries, list):
+                raise ValueError
+            reading = next(
+                entry for entry in entries
+                if isinstance(entry, dict) and entry.get("key") == "available"
+            )
+            timestamp = reading.get("updatedAt")
+            if not isinstance(timestamp, str):
+                raise ValueError
+            parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError
+            # Match the local, timezone-naive format returned by older Telcel labels.
+            last_updated = parsed.astimezone(ZoneInfo("America/Monterrey")).replace(
+                tzinfo=None, microsecond=0,
+            )
+        except (ValueError, StopIteration):
+            raise ValueError("Carrier home response has an invalid usage chart timestamp.") from None
+        logger.debug("Using Telcel usage chart timestamp.")
 
     segments = config("tabs-plans-v2-limited-cutoff-message-0-0-0").get("segments")
     if not isinstance(segments, list) or not all(

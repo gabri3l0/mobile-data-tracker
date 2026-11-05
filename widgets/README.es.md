@@ -66,6 +66,21 @@ solicitudes duplicadas.
 guardados o falló. Si no hay una lectura guardada y falla la consulta, muestra un
 error. Las imágenes de fondo se guardan por separado durante 24 horas.
 
+## Autenticación de Telcel
+
+Cuando se necesita consumo actualizado de Telcel, el widget descarga la página
+de inicio de sesión y su JavaScript para obtener `MTL_AUTHORIZATION_BASIC`. Lee
+la configuración como texto sin ejecutar el código descargado. Cada solicitud
+tiene un límite de 5 segundos y permanece en el origen HTTPS de Telcel.
+
+El descubrimiento se intenta una vez por consulta real, sin caché separada de
+Basic auth. Si falla, se usa el valor incluido en el script como respaldo. Si la
+lectura guardada sigue vigente, no se realizan solicitudes de descubrimiento,
+inicio de sesión ni consumo. Se conserva el flujo de inicio de sesión → intercambio
+de token → consumo → cierre de sesión SSO, incluido el cierre tras fallos del
+intercambio o consumo. Los intercambios rechazados no se reintentan automáticamente.
+La autenticación de Bait no cambia.
+
 ## Actualizaciones del widget
 
 Los cuatro scripts comparten una versión de lanzamiento incluida en el código.

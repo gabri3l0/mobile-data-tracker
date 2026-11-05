@@ -81,9 +81,18 @@ uv sync
 cp .env.example .env
 ```
 
-Configura `TELCEL_USERNAME`, `TELCEL_PASSWORD` y `TELCEL_BASIC_AUTH` en tu `.env`
-local; consulta la [plantilla](.env.example). Usa la credencial Basic codificada,
-sin el prefijo `Basic`. Las URLs y el scope de Telcel se definen en
+Configura `TELCEL_USERNAME` y `TELCEL_PASSWORD` en tu `.env` local; consulta la
+[plantilla](.env.example). En cada consulta se descargan la página de inicio de
+sesión de Telcel y su JavaScript para obtener `MTL_AUTHORIZATION_BASIC`. El código
+se lee como texto, nunca se ejecuta. Cada solicitud de descubrimiento tiene un
+límite de 5 segundos, solo admite el origen HTTPS configurado y no usa caché separada.
+
+`TELCEL_BASIC_AUTH` es un respaldo opcional si falla el descubrimiento. Usa la
+credencial codificada sin el prefijo `Basic`. Si no se obtiene la configuración y
+no hay respaldo, se devuelve un error del operador. El descubrimiento y el
+intercambio de tokens se intentan una vez por consulta; no se repiten automáticamente
+si se rechaza la autenticación. Se sigue intentando cerrar la sesión SSO tras
+fallos del intercambio o de consumo. Las URLs y el scope se definen en
 `src/providers/telcel/config.py`.
 
 Para Bait, configura `BAIT_SERVICE_KEY` y, si usas la CLI, `BAIT_PHONE`. La API

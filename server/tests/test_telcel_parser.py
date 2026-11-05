@@ -36,6 +36,60 @@ def test_zero_total(home_response):
     assert result["remaining_percentage"] is None
 
 
+def test_web_timestamp_used_when_mobile_timestamp_is_absent(home_response):
+    home_response["data"]["components"][4]["id"] = "last-update-text-web"
+    assert parse_usage(home_response)["last_updated"] == "2026-12-30T14:35:00"
+
+
+def test_mobile_timestamp_takes_precedence_over_web_timestamp(home_response):
+    home_response["data"]["components"].append({
+        "id": "last-update-text-web", "config": {"value": "Información al 29/12/2026 12:00 h"},
+    })
+    assert parse_usage(home_response)["last_updated"] == "2026-12-30T14:35:00"
+    home_response["data"]["components"][4]["config"]["value"] = "invalid"
+    with pytest.raises(ValueError, match="invalid last-update-text date"):
+        parse_usage(home_response)
+
+
+@pytest.mark.parametrize("chart_id", [
+    "tabs-plans-v2-usage-chart-0-0-0", "tabs-plans-v2-usage-chart-web-0-0-0",
+])
+def test_sync_response_uses_chart_reading_time(home_response, capsys, chart_id):
+    home_response["data"]["components"][4] = {
+        "id": "last-sync-text", "config": {"value": "Actualizado ahora"},
+    }
+    home_response["data"]["components"].append({
+        "id": chart_id,
+        "config": {"data": [{"key": "available", "updatedAt": "2026-11-05T05:22:00.503Z"}]},
+    })
+    home_response["meta"] = {"generatedAt": "2026-11-06T05:22:00.540Z"}
+    home_response["data"]["components"][5]["config"]["value"] = "24 de noviembre"
+    result = parse_usage(home_response)
+    assert result["last_updated"] == "2026-11-04T23:22:00"
+    assert result["expiration_date"] == "2026-11-24"
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("timestamp", [None, "invalid", "2026-11-05T05:22:00"])
+def test_invalid_chart_timestamp_is_not_replaced_by_generation_time(home_response, timestamp):
+    home_response["data"]["components"][4]["id"] = "last-sync-text"
+    home_response["data"]["components"].append({
+        "id": "tabs-plans-v2-usage-chart-0-0-0",
+        "config": {"data": [{"key": "available", "updatedAt": timestamp}]},
+    })
+    home_response["meta"] = {"generatedAt": "2026-11-05T05:22:00.540Z"}
+    with pytest.raises(ValueError, match="invalid usage chart timestamp"):
+        parse_usage(home_response)
+
+
+def test_invalid_web_timestamp_is_not_replaced_with_current_time(home_response):
+    component = home_response["data"]["components"][4]
+    component["id"] = "last-update-text-web"
+    component["config"]["value"] = "invalid"
+    with pytest.raises(ValueError, match="invalid last-update-text-web date"):
+        parse_usage(home_response)
+
+
 @pytest.mark.parametrize("available,unit,expected", [
     ("1,000", "MB", 1.0), ("1000", "MB", 1.0), (1000, "MB", 1.0),
     ("500", "MB", 0.5), ("512.5", "MB", 0.5125), ("5", "MB", 0.005),

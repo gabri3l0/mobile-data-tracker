@@ -46,7 +46,7 @@ async function loadWidget(design, options = {}) {
   source = source.replace(/\nawait main\(\);\s*$/, '');
   const state = {
     now: NOW, keys: new Map(), files: new Map(), queue: [], alerts: [], prompts: [],
-    requests: [], versionRequests: [], versionQueue: [], openedURLs: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
+    requests: [], discoveryRequests: [], discoveryQueue: [], versionRequests: [], versionQueue: [], openedURLs: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
     writeError: false, removeError: false, keyWriteError: false,
     ...options,
   };
@@ -101,10 +101,12 @@ async function loadWidget(design, options = {}) {
     constructor(url) { this.url = url; this.method = 'GET'; this.headers = {}; }
     async reply(kind) {
       const isVersion = this.url === 'https://gabri3l0.github.io/mobile-data-tracker/widgets/version.json';
-      const requests = isVersion ? state.versionRequests : state.requests;
+      const isDiscovery = this.url.startsWith('https://www.mitelcel.com/');
+      const requests = isVersion ? state.versionRequests : isDiscovery ? state.discoveryRequests : state.requests;
       requests.push({ url: this.url, method: this.method, headers: this.headers,
-        body: this.body, timeout: this.timeoutInterval, kind });
-      const next = isVersion ? (state.versionQueue.shift() || { body: { version: RELEASE_VERSION } }) : state.queue.shift();
+        body: this.body, timeout: this.timeoutInterval, onRedirect: this.onRedirect, kind });
+      const next = isVersion ? (state.versionQueue.shift() || { body: { version: RELEASE_VERSION } })
+        : isDiscovery ? (state.discoveryQueue.shift() || { status: 404, text: '' }) : state.queue.shift();
       if (!next) throw new Error('Unexpected mocked request');
       if (next.error) throw next.error;
       if (next.advance) state.now += next.advance;
@@ -183,6 +185,7 @@ async function loadWidget(design, options = {}) {
     SETTINGS, SAMPLE_DATA, KEYCHAIN_KEY, CACHE_FILE, readCredentials, configureCredentials,
     credentialsForRun, parseUsage, isUsageData, loadUsage, fetchUsage, readCache, writeCache,
     retryDeadline, createWidget, main, COLORS, drawProgressBar, drawProgressArc,
+    discoverBasicAuth: typeof discoverBasicAuth === 'function' ? discoverBasicAuth : null,
     loadBackgroundImage: typeof loadBackgroundImage === 'function' ? loadBackgroundImage : null,
   };\n})()`, { filename: `${carrier}-${design}.js` }).runInContext(context);
   if (options.settings) Object.assign(hooks.SETTINGS, options.settings);

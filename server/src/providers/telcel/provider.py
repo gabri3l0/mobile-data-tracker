@@ -1,5 +1,6 @@
 import base64
 import logging
+from urllib.parse import urljoin
 
 import httpx
 
@@ -7,6 +8,7 @@ from src.exceptions import CarrierError, CarrierTimeoutError
 from src.models import UsageData
 from src.providers.telcel.config import TelcelConfig
 from src.providers.telcel.parser import parse_usage
+from src.providers.telcel.web_auth import extract_basic_auth, find_bundle, same_origin
 
 logger = logging.getLogger(__name__)
 
@@ -79,21 +81,55 @@ class TelcelProvider:
         logger.info("Telcel login successful.")
         return token
 
+    def get_basic_auth(self) -> str:
+        """Discover the current web-client credential once per live exchange."""
+        page_url = urljoin(self.config.site_domain, "/mitelcel/login")
+
+        def download(url: str) -> str:
+            for _ in range(4):
+                if not same_origin(url, page_url):
+                    raise ValueError("Unsupported Telcel configuration origin.")
+                response = self._http.get(
+                    url, headers={"Accept": "text/html, application/javascript", "Cookie": ""},
+                    timeout=5.0, follow_redirects=False,
+                )
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ValueError("Missing redirect location.")
+                    url = urljoin(url, location)
+                    continue
+                response.raise_for_status()
+                return response.text
+            raise ValueError("Too many Telcel configuration redirects.")
+
+        try:
+            page = download(page_url)
+            value = extract_basic_auth(download(find_bundle(page, page_url)))
+            logger.debug("Telcel web-client configuration discovered.")
+            return value
+        except (httpx.HTTPError, ValueError):
+            logger.debug("Telcel web-client discovery unavailable; using configured fallback.")
+        fallback = self.config.basic_auth.strip()
+        if fallback and not any(ord(c) < 32 or ord(c) == 127 for c in fallback):
+            return fallback
+        raise CarrierError("Unable to discover Telcel client configuration; no Basic-auth fallback is configured.")
+
     def get_access_token(self, *, login_token: str) -> str:
         logger.info("Retrieving Telcel access token.")
         config = self.config
         self._require(
             TELCEL_USERNAME=config.username,
-            TELCEL_BASIC_AUTH=config.basic_auth,
             scope=config.scope,
             token_url=config.token_url,
             login_token=login_token,
         )
+        basic_auth = self.get_basic_auth()
         response = self._request(
             "GET", config.token_url,
             params={"user": config.username, "token": login_token},
             headers={
-                "Authorization": f"Basic {config.basic_auth}",
+                "Authorization": f"Basic {basic_auth}",
                 "app-version": "0.14",
                 "code-version": "38",
                 "device-id": "DSK",

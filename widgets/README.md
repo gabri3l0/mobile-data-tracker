@@ -65,6 +65,19 @@ subject to retry waits. Simultaneous runs can still make duplicate requests.
 failed. If there is no saved reading and the request fails, it shows an error.
 Image backgrounds are cached separately for 24 hours.
 
+## Telcel authentication
+
+When fresh Telcel usage is needed, the widget downloads the login page and its
+linked application JavaScript to discover `MTL_AUTHORIZATION_BASIC`. It reads the
+configuration as text without executing the downloaded code. Each discovery
+request has a 5-second timeout and stays on Telcel's HTTPS origin.
+
+Discovery runs once per live fetch, with no separate Basic-auth cache. If it
+fails, the embedded value is used as a fallback. A usage-cache hit skips discovery,
+login, and usage requests. The login → token exchange → usage → SSO logout flow
+is preserved, including logout after exchange or usage failures. Rejected token
+exchanges are not automatically retried. Bait authentication is unchanged.
+
 ## Widget updates
 
 All four scripts share a release version embedded in their code. On execution,

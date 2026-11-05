@@ -301,6 +301,66 @@ function formBody(values) {
   return Object.keys(values).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(values[key])}`).join("&");
 }
 
+async function discoverBasicAuth() {
+  const origin = "https://www.mitelcel.com";
+  const sameOrigin = url => typeof url === "string" && url.startsWith(`${origin}/`);
+  async function download(url) {
+    for (let hop = 0; hop < 4; hop++) {
+      if (!sameOrigin(url)) throw new Error("Unsupported configuration origin");
+      const request = new Request(url);
+      request.method = "GET";
+      request.headers = { Accept: "text/html, application/javascript", Cookie: "" };
+      request.timeoutInterval = 5;
+      // Follow redirects ourselves so every hop is checked, not just the first.
+      request.onRedirect = () => null;
+      const text = await request.loadString();
+      const response = request.response;
+      const status = response && response.statusCode;
+      if ([301, 302, 303, 307, 308].includes(status)) {
+        const key = Object.keys(response.headers || {}).find(name => name.toLowerCase() === "location");
+        const location = key && response.headers[key];
+        if (typeof location !== "string" || !location || /[\\\x00-\x20\x7F]/.test(location) || location.startsWith("//")) throw new Error("Invalid configuration redirect");
+        url = location.startsWith("/") ? origin + location
+          : /^[A-Za-z][A-Za-z0-9+.-]*:/.test(location) ? location
+          : url.split(/[?#]/)[0].slice(0, url.split(/[?#]/)[0].lastIndexOf("/") + 1) + location;
+        continue;
+      }
+      if (!Number.isInteger(status) || status < 200 || status >= 300) throw new Error("Configuration unavailable");
+      return text;
+    }
+    throw new Error("Too many configuration redirects");
+  }
+  try {
+    const html = await download(`${origin}/mitelcel/login`);
+    let bundle = null;
+    for (const tag of html.match(/<script\b[^>]*>/gi) || []) {
+      const source = /(?:^|\s)src\s*=\s*(["'])([^"']+)\1/i.exec(tag);
+      if (!source) continue;
+      let url = source[2].replace(/&amp;/g, "&");
+      if (url.startsWith("/assets/")) url = origin + url;
+      else if (url.startsWith("assets/")) url = origin + "/" + url;
+      if (sameOrigin(url) && /^\/assets\/index-[A-Za-z0-9_.-]+\.js(?:\?[^#\s"'<>]*)?(?:#.*)?$/.test(url.slice(origin.length))) {
+        bundle = url;
+        break;
+      }
+    }
+    if (!bundle) throw new Error("Missing application bundle");
+    const script = await download(bundle);
+    const match = /\bMTL_AUTHORIZATION_BASIC["']?\s*:\s*(["'])([^"'\r\n]+)\1/.exec(script);
+    const value = match && match[2];
+    if (!value || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new Error("Invalid client configuration");
+    const decoded = Data.fromBase64String(value).toRawString();
+    if (decoded.indexOf(":") <= 0 || /[\x00-\x1F\x7F]/.test(decoded)) throw new Error("Invalid client configuration");
+    debugLog("Configuración del cliente Telcel obtenida.");
+    return value;
+  } catch {
+    debugLog("No se pudo obtener la configuración Telcel; usando respaldo.");
+  }
+  const fallback = Data.fromBase64String(CLIENT_AUTH).toRawString().trim();
+  if (!fallback || /[\x00-\x1F\x7F]/.test(fallback)) throw diagnosticError("configuration");
+  return fallback;
+}
+
 async function fetchUsage(credentials) {
   debugLog("Inicio de sesión.");
   const login = await requestJson("https://wbl.telcel-id.com:8443/login", "login", {
@@ -316,9 +376,10 @@ async function fetchUsage(credentials) {
   });
   if (login.estatus !== "ok" || typeof login.token !== "string" || !login.token.trim()) throw diagnosticError("login_rejected");
   try {
+    const basicAuth = await discoverBasicAuth();
     const tokens = await requestJson(`https://mi-telcel.smapps.mx/security/1.0.0/v2/token?user=${encodeURIComponent(credentials.phone)}&token=${encodeURIComponent(login.token)}`, "token", {
       headers: {
-        Authorization: `Basic ${Data.fromBase64String(CLIENT_AUTH).toRawString()}`,
+        Authorization: `Basic ${basicAuth}`,
         "app-version": "0.14", "code-version": "38", "device-id": "DSK",
         os: "WEB", "os-version": "13", scope: "token:mit|token:b2f", "x-channel": "web-browser",
       },

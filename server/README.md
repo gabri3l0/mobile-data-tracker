@@ -80,10 +80,18 @@ uv sync
 cp .env.example .env
 ```
 
-Set `TELCEL_USERNAME`, `TELCEL_PASSWORD`, and `TELCEL_BASIC_AUTH` in your local
-`.env`; see the [template](.env.example). Use the encoded Basic credential
-without the `Basic` prefix. Telcel URLs and scope are defined in
-`src/providers/telcel/config.py`.
+Set `TELCEL_USERNAME` and `TELCEL_PASSWORD` in your local `.env`; see the
+[template](.env.example). On each live lookup, Telcel's login page and linked
+application JavaScript are downloaded to discover `MTL_AUTHORIZATION_BASIC`.
+The JavaScript is read as text, never executed. Discovery uses a 5-second timeout
+per request, permits only the configured HTTPS origin, and has no separate cache.
+
+`TELCEL_BASIC_AUTH` is an optional fallback when discovery fails. Supply the
+encoded Basic credential without the `Basic` prefix. If discovery fails and no
+fallback exists, the lookup returns a carrier error. Discovery and token exchange
+are attempted once per lookup; authentication rejection is not automatically retried.
+SSO logout is still attempted after exchange or usage failures. Telcel URLs and
+scope are defined in `src/providers/telcel/config.py`.
 
 For Bait, set `BAIT_SERVICE_KEY` and, for CLI use, `BAIT_PHONE`. The API takes the
 phone number from each request's `username`. Bait URLs are defined in
