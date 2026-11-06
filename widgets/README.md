@@ -101,6 +101,25 @@ opacity. Appearance values are encoded in the URL fragment (`#…`); account
 details are never included. You can adjust the restored settings before generating.
 Older scripts without this feature need one manual update to start checking.
 
+### Update or refresh now
+
+To install the latest published code immediately, run your widget script in
+Scriptable and choose **Obtener nueva versión**, then generate, copy, and replace
+the entire script. This opens the generator without waiting for the version-check cache.
+
+To force a fresh version check and carrier reading:
+
+1. Create a separate Scriptable script named **Clear widget cache** and paste
+   [clear-cache.js](clear-cache.js) into it.
+2. Run it with ▶. It removes the v1/v2 version and usage caches for both Telcel
+   and Bait, including saved retry delays. Your Keychain account details remain saved.
+3. Run your carrier widget script and choose **Ver widget**. It checks the
+   published version and fetches a fresh reading. Use **Obtener nueva versión**
+   to install new code if available.
+
+Clearing cache does not replace installed code or force iOS to redraw a home-screen
+widget immediately. It also removes saved readings used when a carrier request fails.
+
 A failed version check stays silent, keeps the last known update status, and
 retries on the next execution after **one hour**. It does not change carrier
 refresh or retry times. Update checks use a separate 3-second request timeout.
@@ -215,6 +234,7 @@ To try sample data inside Scriptable, set `useSampleData: true`. Choose
 widgets/
 ├── telcel/       Standalone Telcel scripts: solid.js and image.js
 ├── bait/         Standalone Bait scripts: solid.js and image.js
+├── clear-cache.js Scriptable utility to reset version and usage caches
 ├── version.json  Shared published widget release version
 ├── previews/     One HTML preview and code generator
 ├── screenshots/  Widget images for documentation
