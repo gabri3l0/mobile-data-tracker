@@ -105,6 +105,25 @@ incluye su URL y opacidad. La apariencia se codifica en el fragmento de la URL
 restaurados antes de generar el código.
 Los scripts anteriores sin esta función requieren una actualización manual inicial.
 
+### Actualizar o consultar ahora
+
+Para instalar el último código publicado de inmediato, ejecuta el script del widget
+en Scriptable y elige **Obtener nueva versión**. Genera y copia el código y reemplaza
+todo el script. Esta opción abre el generador sin esperar a que venza la caché de versión.
+
+Para forzar una consulta de versión y consumo nuevos:
+
+1. Crea otro script en Scriptable llamado **Limpiar caché del widget** y pega
+   [clear-cache.js](clear-cache.js).
+2. Ejecútalo con ▶. Borra las cachés v1/v2 de versión y consumo de Telcel y Bait,
+   incluidos los tiempos de espera para reintentar. Conserva tu cuenta en Keychain.
+3. Ejecuta el script de tu operador y elige **Ver widget**. Consultará la versión
+   publicada y pedirá una lectura nueva. Usa **Obtener nueva versión** para
+   instalar código nuevo si está disponible.
+
+Borrar la caché no reemplaza el código instalado ni obliga a iOS a redibujar el widget
+de inicio de inmediato. También elimina las lecturas guardadas que se usan si falla el operador.
+
 Si falla la consulta de versión, se conserva el último estado conocido sin avisos
 de error y se reintenta en la siguiente ejecución después de **una hora**. Esto no
 modifica los tiempos de consulta ni de reintento del operador. La solicitud de
@@ -223,6 +242,7 @@ consultar tu consumo real.
 widgets/
 ├── telcel/       Scripts independientes de Telcel: solid.js e image.js
 ├── bait/         Scripts independientes de Bait: solid.js e image.js
+├── clear-cache.js Utilidad de Scriptable para borrar cachés de versión y consumo
 ├── version.json  Versión publicada compartida por los widgets
 ├── previews/     Una vista HTML con generador de código
 ├── screenshots/  Imágenes de los widgets para la documentación
