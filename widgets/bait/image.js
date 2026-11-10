@@ -2,7 +2,7 @@
 // icon-color: yellow; icon-glyph: signal;
 
 const RUN_AT = new Date();
-const WIDGET_VERSION = "1.0.2";
+const WIDGET_VERSION = "1.0.3";
 const WIDGET_CARRIER = "bait";
 const WIDGET_DESIGN = "image";
 // Customize the settings below. Guide: widgets/README.md#customize

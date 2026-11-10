@@ -2,7 +2,7 @@
 // icon-color: red; icon-glyph: signal;
 
 const RUN_AT = new Date();
-const WIDGET_VERSION = "1.0.2";
+const WIDGET_VERSION = "1.0.3";
 const WIDGET_CARRIER = "telcel";
 const WIDGET_DESIGN = "solid";
 // Customize the settings below. Guide: widgets/README.md#customize
