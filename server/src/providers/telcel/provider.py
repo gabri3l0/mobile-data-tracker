@@ -1,12 +1,15 @@
 import base64
 import logging
-from urllib.parse import urljoin
+import re
+from typing import Literal
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
 from src.exceptions import CarrierError, CarrierTimeoutError
 from src.models import UsageData
 from src.providers.telcel.config import TelcelConfig
+from src.providers.telcel.oidc import login_oidc
 from src.providers.telcel.parser import parse_usage
 from src.providers.telcel.web_auth import extract_basic_auth, find_bundle, same_origin
 
@@ -39,8 +42,12 @@ class TelcelProvider:
         error_type = CarrierError
         try:
             response = self._http.request(method, url, **kwargs)
-            logger.debug("Telcel response received (HTTP %s).", response.status_code)
+            rejected = self._log_response(response)
             response.raise_for_status()
+            if rejected:
+                raise CarrierError("Telcel rejected the request before authentication.")
+            if not response.content.strip():
+                raise CarrierError("Telcel returned an empty response instead of JSON.")
             result = response.json()
             if isinstance(result, dict):
                 logger.debug("Telcel request completed (HTTP %s).", response.status_code)
@@ -59,7 +66,83 @@ class TelcelProvider:
         logger.error("%s", error)
         raise error_type(error)
 
-    def login(self) -> str:
+    @staticmethod
+    def _log_response(response: httpx.Response) -> bool:
+        for entry in [*response.history, response]:
+            content_type = entry.headers.get("content-type", "").split(";", 1)[0]
+            logger.debug(
+                "Telcel response: HTTP %s, content type %s, path %s, bytes %s.",
+                entry.status_code, content_type, entry.url.path, len(entry.content),
+            )
+        rejected = "<title>Request Rejected</title>" in response.text
+        if rejected:
+            support = re.search(
+                r"Your support ID is\s+([a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12})\b",
+                response.text,
+            )
+            logger.warning(
+                "Telcel security rejection; support ID: %s.",
+                support.group(1) if support else "unavailable",
+            )
+        return rejected
+
+    def _initialize_login(self) -> str:
+        logger.debug("Loading Telcel login page.")
+        error = "Unable to load the Telcel login page."
+        error_type = CarrierError
+        try:
+            response = self._http.get(
+                self.config.login_url,
+                params={
+                    "sitedomain": self.config.site_domain, "CCode": "52",
+                    "Type": "MSISDN", "Invocation": "iFrame",
+                },
+                headers={"Accept": "text/html", "User-Agent": WEB_USER_AGENT},
+                follow_redirects=True,
+            )
+            rejected = self._log_response(response)
+            response.raise_for_status()
+            if not rejected:
+                return str(response.url)
+            error = "Telcel rejected the login page request before authentication."
+        except httpx.HTTPStatusError as exc:
+            error = f"Telcel login page request failed (HTTP {exc.response.status_code})."
+        except httpx.TimeoutException:
+            error = "Telcel login page request timed out."
+            error_type = CarrierTimeoutError
+        except httpx.RequestError:
+            error = "Telcel login page request failed due to a connection or timeout error."
+        except (httpx.InvalidURL, ValueError):
+            pass
+        logger.error("%s", error)
+        raise error_type(error)
+
+    def login(self, *, auth_mode: Literal["auto", "legacy", "oidc"] = "auto") -> str:
+        if auth_mode not in ("auto", "legacy", "oidc"):
+            raise ValueError("Unsupported Telcel authentication mode.")
+        self._require(TELCEL_USERNAME=self.config.username, TELCEL_PASSWORD=self.config.password)
+        if auth_mode == "oidc":
+            return self.login_oidc()
+        if auth_mode == "legacy":
+            return self.login_legacy()
+        self._require(site_domain=self.config.site_domain, login_url=self.config.login_url)
+        try:
+            return self.login_legacy()
+        except CarrierError as exc:
+            logger.warning("Telcel legacy login failed: %s Trying OIDC once.", exc)
+        try:
+            return self.login_oidc()
+        except CarrierError as exc:
+            logger.error("Telcel OIDC fallback failed: %s", exc)
+            error_type = CarrierTimeoutError if isinstance(exc, CarrierTimeoutError) else CarrierError
+            message = f"Telcel legacy login and OIDC fallback failed. {exc}"
+        raise error_type(message)
+
+    def login_oidc(self) -> str:
+        self._require(TELCEL_USERNAME=self.config.username, TELCEL_PASSWORD=self.config.password)
+        return login_oidc(self._http, self.config, user_agent=WEB_USER_AGENT, log_response=self._log_response)
+
+    def login_legacy(self) -> str:
         logger.info("Trying to log in to Telcel.")
         config = self.config
         self._require(
@@ -68,12 +151,12 @@ class TelcelProvider:
             site_domain=config.site_domain,
             login_url=config.login_url,
         )
+        page_url = self._initialize_login()
+        login_parts = urlsplit(config.login_url)
+        login_origin = f"{login_parts.scheme}://{login_parts.netloc}"
         response = self._request("POST", config.login_url, follow_redirects=True, headers={
-            "Origin": "https://wbl.telcel-id.com:8443",
-            "Referer": (
-                "https://wbl.telcel-id.com:8443/login?"
-                "sitedomain=https://www.mitelcel.com&CCode=52&Type=MSISDN&Invocation=iFrame"
-            ),
+            "Origin": login_origin,
+            "Referer": page_url,
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "X-Requested-With": "XMLHttpRequest",
             "User-Agent": WEB_USER_AGENT,
@@ -83,6 +166,11 @@ class TelcelProvider:
             "pB64": base64.b64encode(config.password.encode("utf-8")).decode("ascii"),
             "CCode": "52",
             "sitedomain": config.site_domain,
+            "Type": "MSISDN",
+            "Invocation": "iFrame",
+            "MSISDN": config.username,
+            "Source": "",
+            "url": login_origin,
         })
         if response.get("estatus") != "ok":
             logger.error("Telcel login rejected.")
@@ -107,6 +195,7 @@ class TelcelProvider:
                     url, headers={"Accept": "text/html, application/javascript", "Cookie": ""},
                     timeout=5.0, follow_redirects=False,
                 )
+                self._log_response(response)
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
@@ -203,8 +292,11 @@ class TelcelProvider:
         logger.info("Telcel home data retrieved successfully.")
         return response
 
-    def get_usage_data(self, *, preserve_units: bool = False) -> UsageData | dict[str, object]:
-        login_token = self.login()
+    def get_usage_data(
+        self, *, preserve_units: bool = False,
+        auth_mode: Literal["auto", "legacy", "oidc"] = "auto",
+    ) -> UsageData | dict[str, object]:
+        login_token = self.login(auth_mode=auth_mode)
         try:
             access_token = self.get_access_token(login_token=login_token)
             response = self.get_home(access_token=access_token)
@@ -227,8 +319,8 @@ class TelcelProvider:
                 data={"token": login_token, "token_type": "revoke"},
                 timeout=5.0,
             )
+            self._log_response(response)
             response.raise_for_status()
-            # A successful response may have an empty body. Do not log its contents.
             logger.info("Telcel SSO revocation request completed.")
         except Exception:
             # Cleanup must not hide a reading or the original carrier/parser failure.

@@ -13,11 +13,19 @@ def test_login_sends_decoded_password_field_and_encoded_password(carrier):
     request, = carrier.requests
     assert request.method == "POST"
     assert request.url.path == "/login"
-    form = parse_qs(request.content.decode())
+    page, = carrier.login_page_requests
+    assert page.url.params["Invocation"] == "iFrame"
+    assert request.headers["Referer"] == str(page.url)
+    form = parse_qs(request.content.decode(), keep_blank_values=True)
     assert form.pop("username") == ["test-user"]
     assert form.pop("pB64") == ["dGVzdC1wYXNzd29yZA=="]
     assert form.pop("CCode") == ["52"]
     assert form.pop("sitedomain") == ["https://carrier.example"]
+    assert form.pop("Type") == ["MSISDN"]
+    assert form.pop("Invocation") == ["iFrame"]
+    assert form.pop("MSISDN") == ["test-user"]
+    assert form.pop("Source") == [""]
+    assert form.pop("url") == ["https://carrier.example"]
     password_field, = form
     assert base64.b64encode(password_field.encode()).decode() == "dGVsY2VsLXBhc3M="
     assert form[password_field] == ["test-password"]
@@ -134,7 +142,7 @@ def test_network_timeout_uses_shared_timeout_exception(carrier, monkeypatch):
 
     monkeypatch.setattr(carrier.http, "request", timeout)
     with pytest.raises(CarrierTimeoutError) as error:
-        carrier.provider.login()
+        carrier.provider.login(auth_mode="legacy")
     assert "private-request-details" not in str(error.value)
 
 

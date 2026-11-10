@@ -225,8 +225,9 @@ for (const design of ['solid', 'image']) {
 
   test(`${design}: failed login does not attempt logout`, async () => {
     const { hooks, state } = await loadWidget(design, { queue: [{ body: { estatus: 'failed' } }] });
-    await assert.rejects(hooks.fetchUsage(CREDENTIALS), error => error.code === 'login_rejected');
+    await assert.rejects(hooks.fetchUsage(CREDENTIALS), error => error.code === 'oidc_authorize_http_401');
     assert.equal(state.requests.length, 1);
+    assert.equal(state.oidcRequests.length, 1);
   });
 
   test(`${design}: failed logout does not discard successful data`, async () => {

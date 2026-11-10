@@ -121,7 +121,7 @@ function debugLog(message) {
 
 function diagnosticError(code) {
   const error = new Error("No se pudo consultar Telcel.");
-  error.code = /^(configuration|usage_data|login_rejected|token_missing|(?:login|token|usage|logout)_(?:network|json|http_[1-5]\d{2}))$/.test(code) ? code : "unknown";
+  error.code = /^(configuration|usage_data|login_rejected|token_missing|(?:login|token|usage|logout|oidc_authorize|oidc_token)_(?:network|json|http_[1-5]\d{2})|oidc_(?:code|state|authorize_rejected|token_missing|token_rejected))$/.test(code) ? code : "unknown";
   return error;
 }
 
@@ -256,13 +256,18 @@ function retryDeadline(headers) {
   return Number.isFinite(deadline) && deadline > Date.now() ? deadline : Date.now() + SETTINGS.retryMinutes * 60000;
 }
 
-async function requestText(url, stage, options = {}) {
+async function requestResponse(url, stage, options = {}) {
   const request = new Request(url);
   request.method = options.method || "GET";
   request.headers = { Accept: "application/json", ...options.headers };
   request.timeoutInterval = options.timeoutSeconds || SETTINGS.requestTimeoutSeconds;
   if (options.body !== undefined) request.body = options.body;
-  const label = ["login", "token", "usage", "logout"].includes(stage) ? stage : "request";
+  let redirectLocation = "";
+  if (options.manualRedirects) request.onRedirect = next => {
+    redirectLocation = next && typeof next.url === "string" ? next.url : "";
+    return null;
+  };
+  const label = ["login", "token", "usage", "logout", "oidc_authorize", "oidc_token"].includes(stage) ? stage : "request";
   const startedAt = Date.now();
   debugLog(`Solicitud ${label}: iniciada.`);
   let text;
@@ -275,7 +280,8 @@ async function requestText(url, stage, options = {}) {
   const status = request.response ? request.response.statusCode : 0;
   const safeStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : "desconocido";
   debugLog(`Solicitud ${label}: HTTP ${safeStatus} (${Date.now() - startedAt} ms).`);
-  if (!Number.isInteger(status) || status < 200 || status >= 300) {
+  const allowedRedirect = options.acceptRedirects && [301, 302, 303, 307, 308].includes(status);
+  if (!Number.isInteger(status) || status < 200 || (status >= 300 && !allowedRedirect)) {
     const error = diagnosticError(`${stage}_http_${status}`);
     if (status === 429) {
       error.retryAt = retryDeadline(request.response.headers || {});
@@ -283,7 +289,11 @@ async function requestText(url, stage, options = {}) {
     }
     throw error;
   }
-  return text;
+  return { text, status, headers: request.response.headers || {}, redirectLocation };
+}
+
+async function requestText(url, stage, options = {}) {
+  return (await requestResponse(url, stage, options)).text;
 }
 
 async function requestJson(url, stage, options = {}) {
@@ -362,8 +372,8 @@ async function discoverBasicAuth() {
   return fallback;
 }
 
-async function fetchUsage(credentials) {
-  debugLog("Inicio de sesión.");
+async function loginLegacy(credentials) {
+  debugLog("Inicio de sesión normal.");
   const login = await requestJson("https://wbl.telcel-id.com:8443/login", "login", {
     method: "POST",
     headers: {
@@ -379,12 +389,103 @@ async function fetchUsage(credentials) {
       pB64: Data.fromString(credentials.password).toBase64String(),
       CCode: "52",
       sitedomain: "https://www.mitelcel.com",
+      Type: "MSISDN", Invocation: "iFrame", MSISDN: credentials.phone, Source: "",
+      url: "https://wbl.telcel-id.com:8443",
     }),
   });
   if (login.estatus !== "ok" || typeof login.token !== "string" || !login.token.trim()) throw diagnosticError("login_rejected");
+  return login.token;
+}
+
+function oidcHeader(headers, name) {
+  const key = Object.keys(headers).find(key => key.toLowerCase() === name);
+  return key && typeof headers[key] === "string" ? headers[key] : "";
+}
+
+function oidcCode(response, state) {
+  let json = null;
+  try { json = JSON.parse(response.text); } catch {}
+  const candidates = json && typeof json === "object" && !Array.isArray(json) ? [json] : [];
+  const locations = [oidcHeader(response.headers, "x-oidc-redirect-location"),
+    oidcHeader(response.headers, "location"), response.redirectLocation,
+    candidates.length ? "" : response.text.trim()];
+  for (const location of locations) {
+    if (typeof location !== "string" || !location || location.includes("<") || !/^(https?:\/\/|\/|\?|code=|error=)/.test(location)) continue;
+    const query = (location.includes("?") ? location.slice(location.indexOf("?") + 1) : location).split("#")[0];
+    const values = {};
+    try {
+      for (const pair of query.split("&")) {
+        const index = pair.indexOf("=");
+        const key = decodeURIComponent((index < 0 ? pair : pair.slice(0, index)).replace(/\+/g, " "));
+        const value = decodeURIComponent((index < 0 ? "" : pair.slice(index + 1)).replace(/\+/g, " "));
+        if (Object.prototype.hasOwnProperty.call(values, key) && values[key] !== value) throw diagnosticError("oidc_code");
+        values[key] = value;
+      }
+    } catch { throw diagnosticError("oidc_code"); }
+    candidates.push(values);
+  }
+  const codes = new Set();
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(candidate, "state") && candidate.state !== state) throw diagnosticError("oidc_state");
+    if (candidate.error || candidate.error_description) throw diagnosticError("oidc_authorize_rejected");
+    if (typeof candidate.code === "string" && candidate.code.trim()) codes.add(candidate.code.trim());
+  }
+  if (codes.size !== 1) throw diagnosticError("oidc_code");
+  return [...codes][0];
+}
+
+async function loginOidc(credentials) {
+  const base = "https://www.mitelcel.com/oid-authorize-prod";
+  const clientId = "31f419f6-5446-4e7e-a275-daf60f568698";
+  const redirectUri = "https://mtl.smapps.mx:1333/sso/callback";
+  const state = UUID.string();
+  const response = await requestResponse(`${base}/authorize?${formBody({
+    client_id: clientId, redirect_uri: redirectUri, response_type: "code", scope: "openid",
+    acr_values: "1", state, nonce: UUID.string(),
+  })}`, "oidc_authorize", {
+    manualRedirects: true, acceptRedirects: true,
+    headers: { USERNAME: `52${credentials.phone}`, PASSWORD: credentials.password,
+      Accept: "application/json", "Accept-Charset": "UTF-8", "User-Agent": WEB_USER_AGENT },
+  });
+  const code = oidcCode(response, state);
+  debugLog("OIDC: código de autorización recibido.");
+  const tokens = await requestJson(`${base}/token`, "oidc_token", {
+    method: "POST", manualRedirects: true,
+    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": WEB_USER_AGENT },
+    body: formBody({ grant_type: "authorization_code", client_id: clientId, redirect_uri: redirectUri, code }),
+  });
+  const entries = tokens.tokenResponse && tokens.tokenResponse.tokens;
+  const nested = Array.isArray(entries) ? entries.find(entry => entry && entry.id === "token:mit") : null;
+  // Telcel may include error: "Seccessful" alongside a valid token.
+  const token = [tokens.access_token, nested && nested.access_token, tokens.token]
+    .find(value => typeof value === "string" && value.trim());
+  if (!token) throw diagnosticError(tokens.error ? "oidc_token_rejected" : "oidc_token_missing");
+  debugLog("OIDC: sesión SSO obtenida.");
+  return token;
+}
+
+async function loginTelcel(credentials) {
+  if (!/^\d{10}$/.test(credentials.phone) || typeof credentials.password !== "string" || !credentials.password.trim()) throw diagnosticError("configuration");
+  let legacyError;
+  try {
+    return await loginLegacy(credentials);
+  } catch (error) {
+    legacyError = error;
+    debugLog(`Login normal falló: ${diagnosticError(error.code || "unknown").code}. Intentando OIDC una vez.`);
+  }
+  try {
+    return await loginOidc(credentials);
+  } catch (error) {
+    if (legacyError.retryAt) error.retryAt = Math.max(error.retryAt || 0, legacyError.retryAt);
+    throw error;
+  }
+}
+
+async function fetchUsage(credentials) {
+  const ssoToken = await loginTelcel(credentials);
   try {
     const basicAuth = await discoverBasicAuth();
-    const tokens = await requestJson(`https://mi-telcel.smapps.mx/security/1.0.0/v2/token?user=${encodeURIComponent(credentials.phone)}&token=${encodeURIComponent(login.token)}`, "token", {
+    const tokens = await requestJson(`https://mi-telcel.smapps.mx/security/1.0.0/v2/token?user=${encodeURIComponent(credentials.phone)}&token=${encodeURIComponent(ssoToken)}`, "token", {
       headers: {
         Authorization: `Basic ${basicAuth}`,
         Accept: "application/json", "Content-Type": "application/json",
@@ -411,7 +512,7 @@ async function fetchUsage(credentials) {
     try {
       await requestText("https://dev.smapps.mx:9000/sso/revoke", "logout", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formBody({ token: login.token, token_type: "revoke" }), timeoutSeconds: 5,
+        body: formBody({ token: ssoToken, token_type: "revoke" }), timeoutSeconds: 5,
       });
     } catch {
       debugLog("No se pudo completar el cierre de sesión.");

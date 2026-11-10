@@ -15,9 +15,24 @@ from src.providers.telcel.provider import TelcelProvider
 def carrier(monkeypatch):
     """Provide a carrier backed entirely by an in-memory HTTP transport."""
     state = SimpleNamespace(requests=[], discovery_requests=[], discovery_responses=[],
+                            login_page_requests=[], login_page_responses=[], oidc_requests=[], oidc_responses=[],
                             payload={}, status=200, content=None, payloads=[])
 
     def respond(request):
+        if request.method == "GET" and request.url.path == "/login":
+            state.login_page_requests.append(request)
+            result = state.login_page_responses.pop(0) if state.login_page_responses else httpx.Response(200, text="<html>Login</html>")
+            if isinstance(result, Exception):
+                raise result
+            return result
+        if request.url.path.startswith("/oid-authorize-prod/"):
+            state.oidc_requests.append(request)
+            result = state.oidc_responses.pop(0) if state.oidc_responses else httpx.Response(401)
+            if isinstance(result, Exception):
+                raise result
+            if callable(result):
+                return result(request)
+            return result
         if request.url.path == "/mitelcel/login" or request.url.path.startswith("/assets/"):
             state.discovery_requests.append(request)
             if not state.discovery_responses:

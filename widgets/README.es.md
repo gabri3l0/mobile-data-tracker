@@ -81,6 +81,23 @@ de token → consumo → cierre de sesión SSO, incluido el cierre tras fallos d
 intercambio o consumo. Los intercambios rechazados no se reintentan automáticamente.
 La autenticación de Bait no cambia.
 
+Los dos diseños de Telcel intentan primero el login normal y usan **un solo
+fallback OIDC** si falla, incluso por respuesta vacía/HTML, credenciales rechazadas,
+error HTTP o timeout. OIDC llama a `/oid-authorize-prod/authorize` con `52` más
+el número de 10 dígitos, recibe un código temporal en la respuesta o encabezados
+de redirección y lo intercambia en `/oid-authorize-prod/token` por un token SSO.
+Las redirecciones se interceptan sin visitar el callback. Cada intento genera
+`state` y `nonce` nuevos y verifica `state` si vuelve en la respuesta. Se acepta
+un token válido aunque Telcel también incluya `error: "Seccessful"`.
+
+Después de cualquiera de los dos logins se obtiene `token:b2f`, se consulta el
+consumo y se intenta cerrar la sesión SSO en `finally`. Un fallo posterior del
+intercambio o consumo no reinicia el login. Si fallan ambos métodos, se conservan
+la lectura anterior y las reglas de reintento. Los logs de depuración muestran
+las etapas OIDC y códigos de error fijos sin credenciales, códigos de autorización
+ni tokens. Reemplaza el script instalado en Scriptable para usar este flujo;
+borrar la caché por sí solo no actualiza el código.
+
 ## Actualizaciones del widget
 
 Los cuatro scripts comparten una versión de lanzamiento incluida en el código.
