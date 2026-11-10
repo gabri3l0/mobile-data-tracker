@@ -78,6 +78,22 @@ login, and usage requests. The login → token exchange → usage → SSO logout
 is preserved, including logout after exchange or usage failures. Rejected token
 exchanges are not automatically retried. Bait authentication is unchanged.
 
+Both Telcel designs try the normal login first and use **one OIDC fallback** if
+that login fails, including empty/HTML responses, rejected credentials, HTTP
+errors, and network timeouts. OIDC calls `/oid-authorize-prod/authorize` with
+`52` plus the 10-digit phone number, receives a temporary code from the response
+or redirect headers, and exchanges it at `/oid-authorize-prod/token` for an SSO
+token. Authorization redirects are intercepted without visiting the callback;
+`state` and `nonce` are generated per attempt, and returned `state` is checked
+when present. A valid token is accepted even with Telcel's `error: "Seccessful"`.
+
+After either login succeeds, the widget exchanges the SSO token for `token:b2f`,
+reads usage, and attempts SSO logout in `finally`. An exchange or usage failure
+does not trigger another login. If both login methods fail, the existing cached
+reading and retry rules apply. Debug logs include OIDC stages and fixed error
+codes without credentials, authorization codes, or tokens. Install the updated
+script in Scriptable to use this behavior; clearing cache alone does not update code.
+
 ## Widget updates
 
 All four scripts share a release version embedded in their code. On execution,

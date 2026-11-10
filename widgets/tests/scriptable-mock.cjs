@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { randomUUID } = require('node:crypto');
 
 const KEY = 'mobile-data-tracker.telcel.credentials.v1';
 const CACHE = '/library/mobile-data-tracker-telcel-usage-v1.json';
@@ -46,7 +47,7 @@ async function loadWidget(design, options = {}) {
   source = source.replace(/\nawait main\(\);\s*$/, '');
   const state = {
     now: NOW, keys: new Map(), files: new Map(), queue: [], alerts: [], prompts: [],
-    requests: [], discoveryRequests: [], discoveryQueue: [], versionRequests: [], versionQueue: [], openedURLs: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
+    requests: [], oidcRequests: [], oidcQueue: [], discoveryRequests: [], discoveryQueue: [], versionRequests: [], versionQueue: [], openedURLs: [], logs: [], texts: [], widgets: [], nodes: [], drawings: [], previews: 0, completed: 0,
     writeError: false, removeError: false, keyWriteError: false,
     ...options,
   };
@@ -101,16 +102,20 @@ async function loadWidget(design, options = {}) {
     constructor(url) { this.url = url; this.method = 'GET'; this.headers = {}; }
     async reply(kind) {
       const isVersion = this.url === 'https://gabri3l0.github.io/mobile-data-tracker/widgets/version.json';
-      const isDiscovery = this.url.startsWith('https://www.mitelcel.com/');
-      const requests = isVersion ? state.versionRequests : isDiscovery ? state.discoveryRequests : state.requests;
+      const isOidc = this.url.startsWith('https://www.mitelcel.com/oid-authorize-prod/');
+      const isDiscovery = !isOidc && this.url.startsWith('https://www.mitelcel.com/');
+      const requests = isVersion ? state.versionRequests : isOidc ? state.oidcRequests : isDiscovery ? state.discoveryRequests : state.requests;
       requests.push({ url: this.url, method: this.method, headers: this.headers,
         body: this.body, timeout: this.timeoutInterval, onRedirect: this.onRedirect, kind });
-      const next = isVersion ? (state.versionQueue.shift() || { body: { version: RELEASE_VERSION } })
+      let next = isVersion ? (state.versionQueue.shift() || { body: { version: RELEASE_VERSION } })
+        : isOidc ? (state.oidcQueue.shift() || { status: 401, text: '' })
         : isDiscovery ? (state.discoveryQueue.shift() || { status: 404, text: '' }) : state.queue.shift();
       if (!next) throw new Error('Unexpected mocked request');
+      if (typeof next === 'function') next = next(this);
       if (next.error) throw next.error;
       if (next.advance) state.now += next.advance;
       this.response = { statusCode: next.status === undefined ? 200 : next.status, headers: next.headers || {} };
+      if (next.redirect && this.onRedirect) this.onRedirect({ url: next.redirect });
       return next;
     }
     async loadString() {
@@ -172,6 +177,7 @@ async function loadWidget(design, options = {}) {
     },
     Safari: { open: url => state.openedURLs.push(url) },
     FileManager: { local: () => files }, Alert, Request, ListWidget, Size, Rect, Color, Point, Path, DrawContext,
+    UUID: { string: () => randomUUID() },
     Font: { systemFont: size => ({ size }), boldSystemFont: size => ({ size }), mediumSystemFont: size => ({ size }) },
     Data: {
       fromString: value => ({ toBase64String: () => Buffer.from(value, 'utf8').toString('base64') }),
