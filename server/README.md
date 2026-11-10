@@ -88,10 +88,30 @@ per request, permits only the configured HTTPS origin, and has no separate cache
 
 `TELCEL_BASIC_AUTH` is an optional fallback when discovery fails. Supply the
 encoded Basic credential without the `Basic` prefix. If discovery fails and no
-fallback exists, the lookup returns a carrier error. Discovery and token exchange
-are attempted once per lookup; authentication rejection is not automatically retried.
-SSO logout is still attempted after exchange or usage failures. Telcel URLs and
-scope are defined in `src/providers/telcel/config.py`.
+fallback exists, the lookup returns a carrier error. Basic-auth discovery and the
+usage-token exchange are attempted once per lookup.
+
+Telcel authentication defaults to **normal login, then one OIDC fallback**. The
+normal flow loads the login page in the same HTTP session, submits the complete
+form, and follows the redirect to obtain an SSO token. If that login fails
+(including empty/HTML responses, rejected credentials, HTTP errors, or timeout),
+the provider tries OIDC once. This can mean a second authentication attempt even
+after a credential rejection or temporary block; there are no further retries.
+Missing credentials fail before requests are sent.
+
+OIDC sends `52` plus the configured 10-digit phone number in the `USERNAME` header.
+It requests an authorization code from `/oid-authorize-prod/authorize`, reads it
+from JSON or a callback location, then posts it to `/oid-authorize-prod/token`.
+No browser or JavaScript execution is required. A valid SSO token is accepted
+even when the response also contains Telcel's `error: "Seccessful"` marker.
+`TELCEL_OIDC_CLIENT_ID` and `TELCEL_OIDC_REDIRECT_URI` optionally override the
+defaults observed in Telcel's web bundle; both steps use the same pair.
+
+Both flows then exchange the SSO token for `token:b2f`, fetch consumption, parse
+the reading, and attempt `/sso/revoke` in `finally`. Once a session token exists,
+exchange, consumption, or parser failures do **not** restart authentication.
+The CLI and API share this behavior; widget scripts are unchanged. URLs and
+scope are defined in `src/providers/telcel/config.py` and the OIDC module.
 
 For Bait, set `BAIT_SERVICE_KEY` and, for CLI use, `BAIT_PHONE`. The API takes the
 phone number from each request's `username`. Bait URLs are defined in
@@ -106,12 +126,34 @@ Run the commands below from `server/`.
 | `uv run python main.py --carrier telcel` | Print usage for the Telcel account in `.env`. |
 | `uv run python main.py --carrier bait` | Print usage for `BAIT_PHONE` using `BAIT_SERVICE_KEY`. |
 | `uv run python scripts/create_token.py` | Generate an API key. |
+| `uv run --locked python scripts/probe_telcel_legacy.py` | Normal Telcel flow only, including consumption and logout; no OIDC fallback. |
+| `uv run --locked python scripts/probe_telcel_oidc.py` | OIDC flow only, including consumption and logout; no normal login. |
 | `uv run uvicorn src.api.app:app --reload` | Start the API locally. |
 | `uv run pytest -v` | Run tests without real credentials or carrier requests. |
 
 The CLI defaults to Telcel when `--carrier` is omitted. It reads the selected
 carrier's settings from `.env` and needs no server API key. API rate limits apply only
 to HTTP requests. Set `LOG_LEVEL=DEBUG` for detailed CLI logs.
+
+The two diagnostic scripts read `server/.env`, use the same provider implementation,
+and do not cache readings or tokens. The OIDC script also accepts `--client-id`
+and `--redirect-uri` for an explicit configuration experiment. Logs report stages,
+response status/type/size, and recognized errors without raw response bodies,
+credentials, authorization codes, or tokens. Stop repeated manual runs if Telcel
+reports a temporary block; compare Wi-Fi and hotspot using the same code.
+
+## Private authentication history
+
+Use the root-level `local-history/telcel/` folder for a personal timeline, dated
+code snapshots, HAR captures, and downloaded JavaScript bundles. The entire
+`local-history/` directory is excluded by `.gitignore`; its contents stay local
+and are not included in commits. Raw captures may contain account/session data.
+Do not force-add them. Git ignore rules do not encrypt or back up these files.
+
+For each investigation, record the date, source filenames and SHA-256 hashes,
+base Git commit, steps attempted, and results. Keep copies of original evidence
+and before/after source snapshots without `.env`. Public documentation explains
+the flows; personal captures and the detailed timeline remain in this folder.
 
 Telcel CLI output preserves each reading's value and unit. Its data fields look
 like this (plan details, dates, and percentages are also included):
