@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> None:
         tracker = MobileDataTracker(carrier=args.carrier)
         try:
             if args.carrier == "telcel":
+                # Telcel promotional_data is passed through when the account has a promotion.
                 print(tracker.get_usage_data(preserve_units=True))
             else:
                 print(tracker.get_usage_data())
