@@ -575,9 +575,9 @@ function parseUsage(response) {
   const usedReading = dataReading("used");
   const remainingReading = dataReading("available");
   const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
-  const total = toGB(totalReading);
-  const used = toGB(usedReading);
-  const remaining = toGB(remainingReading);
+  let total = toGB(totalReading);
+  let used = toGB(usedReading);
+  let remaining = toGB(remainingReading);
   const promoSuffix = ["0-1-0", "web-0-1-0"].find(suffix => find(response, `tabs-plans-v2-plan-name-${suffix}`) !== undefined);
   let promotionalData = null;
   if (promoSuffix) {
@@ -650,9 +650,9 @@ function parseUsage(response) {
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: daysUntil,
     last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${seconds}`,
-    total_data: totalReading.amount, total_unit: totalReading.unit,
-    used_data: usedReading.amount, used_unit: usedReading.unit,
-    remaining_data: remainingReading.amount, remaining_unit: remainingReading.unit,
+    total_data: promotionalData ? total : totalReading.amount, total_unit: promotionalData ? "GB" : totalReading.unit,
+    used_data: promotionalData ? used : usedReading.amount, used_unit: promotionalData ? "GB" : usedReading.unit,
+    remaining_data: promotionalData ? remaining : remainingReading.amount, remaining_unit: promotionalData ? "GB" : remainingReading.unit,
     used_percentage: total ? Math.round(used / total * 10000) / 100 : null,
     remaining_percentage: total ? Math.round(remaining / total * 10000) / 100 : null,
     ...(promotionalData ? { promotional_data: promotionalData } : {}),
