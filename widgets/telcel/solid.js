@@ -872,10 +872,12 @@ function createWidget({ data, updateFailed, setupRequired = false, updateAvailab
     widget.addSpacer(3);
     const promo = data.promotional_data;
     addText(widget, promo.name, Font.systemFont(8), COLORS.text);
-    const promoRemaining = promo.remaining_unit === "MB"
-      ? promo.remaining_data.toLocaleString("en-US", { maximumFractionDigits: 2 })
-      : formatGB(promo.remaining_data);
-    addText(widget, `Datos Promocionales · ${promoRemaining} ${promo.remaining_unit} disponibles`, Font.systemFont(8), COLORS.muted);
+    const formatPromo = (amount, unit) => unit === "MB"
+      ? amount.toLocaleString("en-US", { maximumFractionDigits: 2 })
+      : formatGB(amount);
+    addText(widget, "Datos Promocionales", Font.systemFont(8), COLORS.text);
+    addText(widget, `Incluidos ${formatPromo(promo.total_data, promo.total_unit)} ${promo.total_unit} · Usados ${formatPromo(promo.used_data, promo.used_unit)} ${promo.used_unit}`, Font.systemFont(7), COLORS.muted);
+    addText(widget, `Te quedan ${formatPromo(promo.remaining_data, promo.remaining_unit)} ${promo.remaining_unit}`, Font.systemFont(8), COLORS.muted);
   }
   widget.addSpacer();
   if (data.expiration_date !== null) {
