@@ -83,6 +83,48 @@ def parse_usage(
     used = data_gb("used")
     remaining = data_gb("available")
 
+    promotional_data = None
+    promo_suffix = "0-1-0"
+    promo_name_id = f"tabs-plans-v2-plan-name-{promo_suffix}"
+    if find(response, promo_name_id) is None:
+        promo_suffix = "web-0-1-0"
+        promo_name_id = f"tabs-plans-v2-plan-name-{promo_suffix}"
+
+    if find(response, promo_name_id) is not None:
+        promo_name = get(promo_name_id).strip()
+        promo_readings: dict[str, tuple[float, str]] = {}
+        for kind in ("total", "used", "available"):
+            value_id = f"tabs-plans-v2-{kind}-data-value-{promo_suffix}"
+            if find(response, value_id) is None:
+                raise ValueError(f"Carrier home response is missing {value_id}.")
+            amount = number(value_id)
+            unit_id = f"tabs-plans-v2-{kind}-data-unit-{promo_suffix}"
+            unit = "GB" if find(response, unit_id) is None else get(unit_id).strip().upper()
+            if unit not in ("MB", "GB"):
+                raise ValueError(f"Carrier home response has an invalid unit for {unit_id}.")
+            promo_readings[kind] = (amount, unit)
+
+        def promo_gb(kind: str) -> float:
+            amount, unit = promo_readings[kind]
+            return amount / 1000 if unit == "MB" else amount
+
+        promo_total = promo_gb("total")
+        promo_used = promo_gb("used")
+        promo_remaining = promo_gb("available")
+        total += promo_total
+        used += promo_used
+        remaining += promo_remaining
+        promotional_data = {
+            "name": promo_name,
+            "total_data": promo_readings["total"][0],
+            "total_unit": promo_readings["total"][1],
+            "used_data": promo_readings["used"][0],
+            "used_unit": promo_readings["used"][1],
+            "remaining_data": promo_readings["available"][0],
+            "remaining_unit": promo_readings["available"][1],
+        }
+        logger.debug("Telcel promotional data parsed successfully.")
+
     updated_id = "last-update-text"
     if find(response, updated_id) is None and find(response, "last-update-text-web") is not None:
         updated_id = "last-update-text-web"
@@ -174,6 +216,7 @@ def parse_usage(
         "remaining_gb": remaining,
         "used_percentage": round(used / total * 100, 2) if total else None,
         "remaining_percentage": round(remaining / total * 100, 2) if total else None,
+        **({"promotional_data": promotional_data} if promotional_data is not None else {}),
     }
     logger.debug("Carrier usage parsed successfully.")
     if preserve_units:
@@ -183,5 +226,11 @@ def parse_usage(
             result.pop(f"{field}_gb")
             result[f"{field}_data"] = amount
             result[f"{field}_unit"] = unit
+        if promotional_data is not None:
+            result.update({
+                "total_data": total, "total_unit": "GB",
+                "used_data": used, "used_unit": "GB",
+                "remaining_data": remaining, "remaining_unit": "GB",
+            })
         return result
     return usage
