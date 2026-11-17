@@ -18,3 +18,4 @@ class UsageData(TypedDict):
     used_percentage: float | None
     remaining_percentage: float | None
     data_tier: NotRequired[DataTier | None]
+    promotional_data: NotRequired[dict[str, object]]
