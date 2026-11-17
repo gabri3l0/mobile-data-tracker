@@ -261,3 +261,44 @@ def test_malformed_fields(home_response, index, config, error):
     home_response["data"]["components"][index]["config"] = config
     with pytest.raises(ValueError, match=error):
         parse_usage(home_response)
+
+
+def test_promotional_data_is_optional_and_added_after_base_allowance(home_response):
+    components = home_response["data"]["components"]
+    promo_values = {
+        "tabs-plans-v2-plan-name-0-1-0": "PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE",
+        "tabs-plans-v2-total-data-value-0-1-0": "2.5",
+        "tabs-plans-v2-total-data-unit-0-1-0": "GB",
+        "tabs-plans-v2-used-data-value-0-1-0": "0",
+        "tabs-plans-v2-used-data-unit-0-1-0": "MB",
+        "tabs-plans-v2-available-data-value-0-1-0": "2.5",
+        "tabs-plans-v2-available-data-unit-0-1-0": "GB",
+    }
+    components.extend(
+        {"id": component_id, "config": {"value": value}}
+        for component_id, value in promo_values.items()
+    )
+    result = parse_usage(home_response)
+    assert result["total_gb"] == 22.5
+    assert result["used_gb"] == 5
+    assert result["remaining_gb"] == 17.5
+    assert result["used_percentage"] == 22.22
+    assert result["promotional_data"] == {
+        "name": "PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE",
+        "total_data": 2.5, "total_unit": "GB",
+        "used_data": 0.0, "used_unit": "MB",
+        "remaining_data": 2.5, "remaining_unit": "GB",
+    }
+    preserved = parse_usage(home_response, preserve_units=True)
+    assert preserved["total_data"] == 22.5
+    assert preserved["total_unit"] == "GB"
+    assert preserved["used_data"] == 5
+    assert preserved["remaining_data"] == 17.5
+    assert preserved["promotional_data"] == result["promotional_data"]
+
+
+def test_promotional_data_is_omitted_when_not_present(home_response):
+    result = parse_usage(home_response)
+    assert "promotional_data" not in result
+    assert "promotional_data" not in parse_usage(home_response, preserve_units=True)
+
