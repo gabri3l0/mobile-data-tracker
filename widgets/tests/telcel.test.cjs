@@ -60,7 +60,7 @@ for (const design of ['solid', 'image']) {
     hooks.createWidget({ data });
     assert.ok(state.texts.includes('PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE'));
     assert.ok(state.texts.some(value => value.includes('Datos Promocionales')));
-    assert.ok(state.texts.includes('2.5 GB disponibles'));
+    assert.ok(state.texts.includes('Te quedan 2.5 GB'));
     const withoutPromotion = hooks.parseUsage(homeResponse());
     state.texts.length = 0;
     hooks.createWidget({ data: withoutPromotion });
