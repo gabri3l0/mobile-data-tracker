@@ -34,6 +34,39 @@ for (const design of ['solid', 'image']) {
     }
   });
 
+
+  test(`${design}: promotional data is optional and follows the base allowance`, async () => {
+    const { hooks, state } = await loadWidget(design);
+    const home = homeResponse();
+    home.data.components.push(
+      { id: 'tabs-plans-v2-plan-name-0-1-0', config: { value: 'PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE' } },
+      { id: 'tabs-plans-v2-total-data-value-0-1-0', config: { value: '2.5' } },
+      { id: 'tabs-plans-v2-total-data-unit-0-1-0', config: { value: 'GB' } },
+      { id: 'tabs-plans-v2-used-data-value-0-1-0', config: { value: '0' } },
+      { id: 'tabs-plans-v2-used-data-unit-0-1-0', config: { value: 'MB' } },
+      { id: 'tabs-plans-v2-available-data-value-0-1-0', config: { value: '2.5' } },
+      { id: 'tabs-plans-v2-available-data-unit-0-1-0', config: { value: 'GB' } },
+    );
+    const data = hooks.parseUsage(home);
+    assert.equal(data.total_data, 22.5);
+    assert.equal(data.used_data, 5);
+    assert.equal(data.remaining_data, 17.5);
+    assert.equal(data.used_percentage, 22.22);
+    assert.deepEqual(plain(data.promotional_data), {
+      name: 'PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE',
+      total_data: 2.5, total_unit: 'GB', used_data: 0, used_unit: 'MB',
+      remaining_data: 2.5, remaining_unit: 'GB',
+    });
+    hooks.createWidget({ data });
+    assert.ok(state.texts.includes('PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE'));
+    assert.ok(state.texts.some(value => value.includes('Datos Promocionales')));
+    assert.ok(state.texts.includes('2.5 GB disponibles'));
+    const withoutPromotion = hooks.parseUsage(homeResponse());
+    state.texts.length = 0;
+    hooks.createWidget({ data: withoutPromotion });
+    assert.equal(state.texts.some(value => value.includes('Datos Promocionales')), false);
+  });
+
   test(`${design}: old GB cache migrates to explicit values and units`, async () => {
     const { hooks, state } = await loadWidget(design);
     state.files.set(CACHE, JSON.stringify({
