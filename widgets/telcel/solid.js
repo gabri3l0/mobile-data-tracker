@@ -213,7 +213,13 @@ function isUsageData(data) {
     && Number.isInteger(data.days_until)
     && ["used_percentage", "remaining_percentage"].every(key => data[key] === null || (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0))
     && typeof data.last_updated === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(data.last_updated)
-    && typeof data.expiration_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date);
+    && typeof data.expiration_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date)
+    && (data.promotional_data === undefined || (
+      data.promotional_data && typeof data.promotional_data === "object"
+      && typeof data.promotional_data.name === "string"
+      && ["total_data", "used_data", "remaining_data"].every(key => typeof data.promotional_data[key] === "number" && Number.isFinite(data.promotional_data[key]) && data.promotional_data[key] >= 0)
+      && ["total_unit", "used_unit", "remaining_unit"].every(key => ["MB", "GB"].includes(data.promotional_data[key]))
+    ));
 }
 
 function readCache(credentials) {
@@ -566,6 +572,32 @@ function parseUsage(response) {
     throw diagnosticError("usage_data");
   }
   const totalReading = dataReading("total");
+  const promoSuffix = ["0-1-0", "web-0-1-0"].find(suffix => find(response, `tabs-plans-v2-plan-name-${suffix}`) !== undefined);
+  let promotionalData = null;
+  if (promoSuffix) {
+    const promoName = value(`tabs-plans-v2-plan-name-${promoSuffix}`).trim();
+    const promoReading = kind => {
+      const amount = number(`tabs-plans-v2-${kind}-data-value-${promoSuffix}`);
+      const unitId = `tabs-plans-v2-${kind}-data-unit-${promoSuffix}`;
+      const unit = find(response, unitId) === undefined ? "GB" : value(unitId).trim().toUpperCase();
+      if (!["MB", "GB"].includes(unit)) throw diagnosticError("usage_data");
+      return { amount, unit };
+    };
+    const promoTotal = promoReading("total");
+    const promoUsed = promoReading("used");
+    const promoAvailable = promoReading("available");
+    const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
+    promotionalData = {
+      name: promoName,
+      total_data: promoTotal.amount, total_unit: promoTotal.unit,
+      used_data: promoUsed.amount, used_unit: promoUsed.unit,
+      remaining_data: promoAvailable.amount, remaining_unit: promoAvailable.unit,
+    };
+    // The base allowance is consumed first; promotional usage is added only after it.
+    total += toGB(promoTotal);
+    used += toGB(promoUsed);
+    remaining += toGB(promoAvailable);
+  }
   const usedReading = dataReading("used");
   const remainingReading = dataReading("available");
   const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
@@ -623,6 +655,7 @@ function parseUsage(response) {
     remaining_data: remainingReading.amount, remaining_unit: remainingReading.unit,
     used_percentage: total ? Math.round(used / total * 10000) / 100 : null,
     remaining_percentage: total ? Math.round(remaining / total * 10000) / 100 : null,
+    ...(promotionalData ? { promotional_data: promotionalData } : {}),
   };
   if (!isUsageData(data)) throw diagnosticError("usage_data");
   return data;
@@ -834,6 +867,15 @@ function createWidget({ data, updateFailed, setupRequired = false, updateAvailab
   if (style !== "none") {
     widget.addSpacer(3);
     addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted).centerAlignText();
+  }
+  if (data.promotional_data) {
+    widget.addSpacer(3);
+    const promo = data.promotional_data;
+    addText(widget, promo.name, Font.systemFont(8), COLORS.text);
+    const promoRemaining = promo.remaining_unit === "MB"
+      ? promo.remaining_data.toLocaleString("en-US", { maximumFractionDigits: 2 })
+      : formatGB(promo.remaining_data);
+    addText(widget, `Datos Promocionales · ${promoRemaining} ${promo.remaining_unit} disponibles`, Font.systemFont(8), COLORS.muted);
   }
   widget.addSpacer();
   if (data.expiration_date !== null) {
