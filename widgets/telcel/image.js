@@ -577,6 +577,12 @@ function parseUsage(response) {
     throw diagnosticError("usage_data");
   }
   const totalReading = dataReading("total");
+  const usedReading = dataReading("used");
+  const remainingReading = dataReading("available");
+  const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
+  const total = toGB(totalReading);
+  const used = toGB(usedReading);
+  const remaining = toGB(remainingReading);
   const promoSuffix = ["0-1-0", "web-0-1-0"].find(suffix => find(response, `tabs-plans-v2-plan-name-${suffix}`) !== undefined);
   let promotionalData = null;
   if (promoSuffix) {
@@ -603,12 +609,6 @@ function parseUsage(response) {
     used += toGB(promoUsed);
     remaining += toGB(promoAvailable);
   }
-  const usedReading = dataReading("used");
-  const remainingReading = dataReading("available");
-  const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
-  const total = toGB(totalReading);
-  const used = toGB(usedReading);
-  const remaining = toGB(remainingReading);
   const legacyId = ["last-update-text", "last-update-text-web"].find(id => find(response, id) !== undefined);
   let parts;
   let seconds = "00";
