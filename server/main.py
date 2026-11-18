@@ -28,7 +28,8 @@ def main(argv: list[str] | None = None) -> None:
         tracker = MobileDataTracker(carrier=args.carrier)
         try:
             if args.carrier == "telcel":
-                print(tracker.get_usage_data(preserve_units=True))
+                usage_data = tracker.get_usage_data(preserve_units=True)
+                print(usage_data)
             else:
                 print(tracker.get_usage_data())
         finally:

@@ -213,7 +213,13 @@ function isUsageData(data) {
     && Number.isInteger(data.days_until)
     && ["used_percentage", "remaining_percentage"].every(key => data[key] === null || (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0))
     && typeof data.last_updated === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(data.last_updated)
-    && typeof data.expiration_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date);
+    && typeof data.expiration_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.expiration_date)
+    && (data.promotional_data === undefined || (
+      data.promotional_data && typeof data.promotional_data === "object"
+      && typeof data.promotional_data.name === "string"
+      && ["total_data", "used_data", "remaining_data"].every(key => typeof data.promotional_data[key] === "number" && Number.isFinite(data.promotional_data[key]) && data.promotional_data[key] >= 0)
+      && ["total_unit", "used_unit", "remaining_unit"].every(key => ["MB", "GB"].includes(data.promotional_data[key]))
+    ));
 }
 
 function readCache(credentials) {
@@ -531,6 +537,28 @@ function parseUsage(response) {
     }
     return undefined;
   }
+  if (SETTINGS.debug) {
+    const fields = {};
+    const relevantId = /^(?:text-plan-name|text-due-value|last-update-text(?:-web)?|tabs-plans-v2-(?:plan-name-(?:0-0-0|0-1-0|web-0-1-0)|(?:total|used|available)-data-(?:value|unit)-(?:0-0-0|0-1-0|web-0-1-0)|usage-chart-(?:0-0-0|web-0-0-0)|limited-cutoff-message-0-0-0))$/;
+    function collect(node) {
+      if (!node || typeof node !== "object") return;
+      if (typeof node.id === "string" && relevantId.test(node.id) && node.config && typeof node.config === "object") {
+        const config = node.config;
+        if (Array.isArray(config.data)) {
+          fields[node.id] = { data: config.data
+            .filter(entry => entry && entry.key === "available")
+            .map(entry => ({ key: entry.key, updatedAt: entry.updatedAt })) };
+        } else if (Array.isArray(config.segments)) {
+          fields[node.id] = { segments: config.segments.map(segment => ({ text: segment && segment.text })) };
+        } else if (Object.prototype.hasOwnProperty.call(config, "value")) {
+          fields[node.id] = /plan-name/.test(node.id) ? { present: true } : { value: config.value };
+        }
+      }
+      for (const value of Object.values(node)) collect(value);
+    }
+    collect(response);
+    console.log(`[Telcel][${WIDGET_DESIGN}] Relevant response fields before parsing:\n${JSON.stringify({ response_id: response.id, fields }, null, 2)}`);
+  }
   function component(id) {
     const result = find(response, id);
     if (!result || typeof result !== "object" || Array.isArray(result)) throw diagnosticError("usage_data");
@@ -569,9 +597,35 @@ function parseUsage(response) {
   const usedReading = dataReading("used");
   const remainingReading = dataReading("available");
   const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
-  const total = toGB(totalReading);
-  const used = toGB(usedReading);
-  const remaining = toGB(remainingReading);
+  let total = toGB(totalReading);
+  let used = toGB(usedReading);
+  let remaining = toGB(remainingReading);
+  const promoSuffix = ["0-1-0", "web-0-1-0"].find(suffix => find(response, `tabs-plans-v2-plan-name-${suffix}`) !== undefined);
+  let promotionalData = null;
+  if (promoSuffix) {
+    const promoName = value(`tabs-plans-v2-plan-name-${promoSuffix}`).trim();
+    const promoReading = kind => {
+      const amount = number(`tabs-plans-v2-${kind}-data-value-${promoSuffix}`);
+      const unitId = `tabs-plans-v2-${kind}-data-unit-${promoSuffix}`;
+      const unit = find(response, unitId) === undefined ? "GB" : value(unitId).trim().toUpperCase();
+      if (!["MB", "GB"].includes(unit)) throw diagnosticError("usage_data");
+      return { amount, unit };
+    };
+    const promoTotal = promoReading("total");
+    const promoUsed = promoReading("used");
+    const promoAvailable = promoReading("available");
+    const toGB = reading => reading.unit === "MB" ? reading.amount / 1000 : reading.amount;
+    promotionalData = {
+      name: promoName,
+      total_data: promoTotal.amount, total_unit: promoTotal.unit,
+      used_data: promoUsed.amount, used_unit: promoUsed.unit,
+      remaining_data: promoAvailable.amount, remaining_unit: promoAvailable.unit,
+    };
+    // The base allowance is consumed first; promotional usage is added only after it.
+    total += toGB(promoTotal);
+    used += toGB(promoUsed);
+    remaining += toGB(promoAvailable);
+  }
   const legacyId = ["last-update-text", "last-update-text-web"].find(id => find(response, id) !== undefined);
   let parts;
   let seconds = "00";
@@ -618,11 +672,12 @@ function parseUsage(response) {
   const data = {
     plan_name: plan, expiration_date: expiration.toISOString().slice(0, 10), days_until: daysUntil,
     last_updated: `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${seconds}`,
-    total_data: totalReading.amount, total_unit: totalReading.unit,
-    used_data: usedReading.amount, used_unit: usedReading.unit,
-    remaining_data: remainingReading.amount, remaining_unit: remainingReading.unit,
+    total_data: promotionalData ? total : totalReading.amount, total_unit: promotionalData ? "GB" : totalReading.unit,
+    used_data: promotionalData ? used : usedReading.amount, used_unit: promotionalData ? "GB" : usedReading.unit,
+    remaining_data: promotionalData ? remaining : remainingReading.amount, remaining_unit: promotionalData ? "GB" : remainingReading.unit,
     used_percentage: total ? Math.round(used / total * 10000) / 100 : null,
     remaining_percentage: total ? Math.round(remaining / total * 10000) / 100 : null,
+    ...(promotionalData ? { promotional_data: promotionalData } : {}),
   };
   if (!isUsageData(data)) throw diagnosticError("usage_data");
   return data;
@@ -834,6 +889,36 @@ function createWidget({ data, updateFailed, setupRequired = false, updateAvailab
   if (style !== "none") {
     widget.addSpacer(3);
     addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted).centerAlignText();
+  }
+  if (data.promotional_data) {
+    widget.addSpacer(4);
+    const promo = data.promotional_data;
+    const toGB = (amount, unit) => unit === "MB" ? amount / 1000 : amount;
+    const formatAmount = amount => formatGB(Math.max(0, amount));
+    const rows = [
+      {
+        label: "Datos del plan",
+        total: Math.max(0, toGB(data.total_data, data.total_unit) - toGB(promo.total_data, promo.total_unit)),
+        used: Math.max(0, toGB(data.used_data, data.used_unit) - toGB(promo.used_data, promo.used_unit)),
+        remaining: Math.max(0, toGB(data.remaining_data, data.remaining_unit) - toGB(promo.remaining_data, promo.remaining_unit)),
+      },
+      {
+        label: "Datos promocionales",
+        total: toGB(promo.total_data, promo.total_unit),
+        used: toGB(promo.used_data, promo.used_unit),
+        remaining: toGB(promo.remaining_data, promo.remaining_unit),
+      },
+    ];
+    for (const row of rows) {
+      widget.addSpacer(2);
+      addText(widget, `${row.label} · ${formatAmount(row.used)} / ${formatAmount(row.total)} GB usados`, Font.systemFont(7), COLORS.text);
+      const bar = widget.addStack();
+      bar.addSpacer();
+      const progress = bar.addImage(drawProgressBar(row.total > 0 ? row.used / row.total * 100 : 0));
+      progress.imageSize = new Size(BAR_WIDTH, 4);
+      bar.addSpacer();
+      addText(widget, `${formatAmount(row.remaining)} GB disponibles`, Font.systemFont(7), COLORS.muted);
+    }
   }
   widget.addSpacer();
   if (data.expiration_date !== null) {

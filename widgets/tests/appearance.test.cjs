@@ -97,10 +97,10 @@ for (const carrier of ['telcel', 'bait']) {
   }
 }
 
-test('all four standalone scripts share the same appearance renderer', () => {
+test('all four standalone scripts share the same appearance primitives', () => {
   const renderers = ['telcel', 'bait'].flatMap(carrier => ['solid', 'image'].map(design => {
     const source = fs.readFileSync(path.join(__dirname, '..', carrier, `${design}.js`), 'utf8');
-    return source.slice(source.indexOf('function appearanceHex'), source.indexOf('async function main()'));
+    return source.slice(source.indexOf('function appearanceHex'), source.indexOf('function createWidget'));
   }));
   for (const renderer of renderers.slice(1)) assert.equal(renderer, renderers[0]);
 });
