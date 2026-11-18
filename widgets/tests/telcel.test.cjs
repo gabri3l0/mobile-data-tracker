@@ -58,13 +58,14 @@ for (const design of ['solid', 'image']) {
       remaining_data: 2.5, remaining_unit: 'GB',
     });
     hooks.createWidget({ data });
-    assert.ok(state.texts.includes('PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE'));
-    assert.ok(state.texts.some(value => value.includes('Datos Promocionales')));
-    assert.ok(state.texts.includes('Te quedan 2.5 GB'));
+    assert.equal(state.texts.includes('PROMO 50% DE DATOS UPSELL CONTROLADO LIBRE'), false);
+    assert.ok(state.texts.some(value => value.includes('Datos del plan')));
+    assert.ok(state.texts.some(value => value.includes('Datos promocionales')));
+    assert.ok(state.texts.some(value => value.includes('2.5 GB disponibles')));
     const withoutPromotion = hooks.parseUsage(homeResponse());
     state.texts.length = 0;
     hooks.createWidget({ data: withoutPromotion });
-    assert.equal(state.texts.some(value => value.includes('Datos Promocionales')), false);
+    assert.equal(state.texts.some(value => value.includes('Datos promocionales')), false);
   });
 
   test(`${design}: old GB cache migrates to explicit values and units`, async () => {
