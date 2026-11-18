@@ -62,7 +62,7 @@ test('Telcel preview toggles the promotional data breakdown without affecting Ba
   assert.equal(el['promo-breakdown'].hidden, false);
   assert.match(el['promo-breakdown'].innerHTML, /Datos del plan/);
   assert.match(el['promo-breakdown'].innerHTML, /Datos promocionales/);
-  assert.match(el['promo-breakdown'].innerHTML, /2\\.5 GB/);
+  assert.match(el['promo-breakdown'].innerHTML, /2.5 GB/);
 
   el.carrier.value = 'bait'; el.carrier.emit('change');
   assert.equal(el['promo-option'].hidden, true);
