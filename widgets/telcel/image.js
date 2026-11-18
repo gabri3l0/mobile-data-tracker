@@ -532,9 +532,6 @@ async function fetchUsage(credentials) {
 }
 
 function parseUsage(response) {
-  if (SETTINGS.debug) {
-    console.log(`[Telcel][${WIDGET_DESIGN}] Raw response before parsing:\n${JSON.stringify(response, null, 2)}`);
-  }
   function find(node, id) {
     if (node && typeof node === "object") {
       if (node.id === id) return node.config ?? null;
@@ -544,6 +541,28 @@ function parseUsage(response) {
       }
     }
     return undefined;
+  }
+  if (SETTINGS.debug) {
+    const fields = {};
+    const relevantId = /^(?:text-plan-name|text-due-value|last-update-text(?:-web)?|tabs-plans-v2-(?:plan-name-(?:0-0-0|0-1-0|web-0-1-0)|(?:total|used|available)-data-(?:value|unit)-(?:0-0-0|0-1-0|web-0-1-0)|usage-chart-(?:0-0-0|web-0-0-0)|limited-cutoff-message-0-0-0))$/;
+    function collect(node) {
+      if (!node || typeof node !== "object") return;
+      if (typeof node.id === "string" && relevantId.test(node.id) && node.config && typeof node.config === "object") {
+        const config = node.config;
+        if (Array.isArray(config.data)) {
+          fields[node.id] = { data: config.data
+            .filter(entry => entry && entry.key === "available")
+            .map(entry => ({ key: entry.key, updatedAt: entry.updatedAt })) };
+        } else if (Array.isArray(config.segments)) {
+          fields[node.id] = { segments: config.segments.map(segment => ({ text: segment && segment.text })) };
+        } else if (Object.prototype.hasOwnProperty.call(config, "value")) {
+          fields[node.id] = /plan-name/.test(node.id) ? { present: true } : { value: config.value };
+        }
+      }
+      for (const value of Object.values(node)) collect(value);
+    }
+    collect(response);
+    console.log(`[Telcel][${WIDGET_DESIGN}] Relevant response fields before parsing:\n${JSON.stringify({ response_id: response.id, fields }, null, 2)}`);
   }
   function component(id) {
     const result = find(response, id);
@@ -938,15 +957,34 @@ function createWidget({ data, updateFailed, setupRequired = false, updateAvailab
     addText(widget, `${Math.round(clampPercentage(data.used_percentage))}% utilizado`, Font.systemFont(9), COLORS.muted).centerAlignText();
   }
   if (data.promotional_data) {
-    widget.addSpacer(3);
+    widget.addSpacer(4);
     const promo = data.promotional_data;
-    addText(widget, promo.name, Font.systemFont(8), COLORS.text);
-    const formatPromo = (amount, unit) => unit === "MB"
-      ? amount.toLocaleString("en-US", { maximumFractionDigits: 2 })
-      : formatGB(amount);
-    addText(widget, "Datos Promocionales", Font.systemFont(8), COLORS.text);
-    addText(widget, `Incluidos ${formatPromo(promo.total_data, promo.total_unit)} ${promo.total_unit} · Usados ${formatPromo(promo.used_data, promo.used_unit)} ${promo.used_unit}`, Font.systemFont(7), COLORS.muted);
-    addText(widget, `Te quedan ${formatPromo(promo.remaining_data, promo.remaining_unit)} ${promo.remaining_unit}`, Font.systemFont(8), COLORS.muted);
+    const toGB = (amount, unit) => unit === "MB" ? amount / 1000 : amount;
+    const formatAmount = amount => formatGB(Math.max(0, amount));
+    const rows = [
+      {
+        label: "Datos del plan",
+        total: Math.max(0, toGB(data.total_data, data.total_unit) - toGB(promo.total_data, promo.total_unit)),
+        used: Math.max(0, toGB(data.used_data, data.used_unit) - toGB(promo.used_data, promo.used_unit)),
+        remaining: Math.max(0, toGB(data.remaining_data, data.remaining_unit) - toGB(promo.remaining_data, promo.remaining_unit)),
+      },
+      {
+        label: "Datos promocionales",
+        total: toGB(promo.total_data, promo.total_unit),
+        used: toGB(promo.used_data, promo.used_unit),
+        remaining: toGB(promo.remaining_data, promo.remaining_unit),
+      },
+    ];
+    for (const row of rows) {
+      widget.addSpacer(2);
+      addText(widget, `${row.label} · ${formatAmount(row.used)} / ${formatAmount(row.total)} GB usados`, Font.systemFont(7), COLORS.text);
+      const bar = widget.addStack();
+      bar.addSpacer();
+      const progress = bar.addImage(drawProgressBar(row.total > 0 ? row.used / row.total * 100 : 0));
+      progress.imageSize = new Size(BAR_WIDTH, 4);
+      bar.addSpacer();
+      addText(widget, `${formatAmount(row.remaining)} GB disponibles`, Font.systemFont(7), COLORS.muted);
+    }
   }
   widget.addSpacer();
   if (data.expiration_date !== null) {
