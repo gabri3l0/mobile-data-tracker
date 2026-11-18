@@ -30,6 +30,12 @@
     .track { width: 112px; height: 7px; border-radius: 4px; overflow: hidden; background: var(--track, #2c2c30); margin: 4px auto 0; }
     .fill { height: 100%; background: var(--accent, #ff453a); border-radius: inherit; }
     .percentage { text-align: center; margin-top: 3px; font-size: 9px; line-height: 11px; color: var(--secondary, #929298); }
+    .promo-breakdown { margin-top: 5px; font-size: 6px; line-height: 8px; color: var(--secondary, #929298); }
+    .promo-row { margin-top: 3px; }
+    .promo-heading { color: var(--primary, #fff); }
+    .promo-meta { display: flex; justify-content: space-between; gap: 4px; }
+    .promo-track { height: 3px; margin-top: 2px; border-radius: 3px; overflow: hidden; background: var(--track, #2c2c30); }
+    .promo-fill { height: 100%; background: var(--accent, #ff453a); }
     .footer { margin-top: 0; color: var(--secondary, #929298); }
     .expiration { font-size: 9px; line-height: 11px; }
     .execution { flex-shrink: 0; font-size: 8px; line-height: 10px; margin-top: 3px; color: var(--secondary, #929298); font-variant-numeric: tabular-nums; }
@@ -140,6 +146,7 @@
     <details>
       <summary>Opciones avanzadas</summary>
       <label>Estado de ejemplo<select id="state"><option value="success">Lectura correcta</option><option value="stale">Falló la actualización</option><option value="update">Nueva versión disponible</option><option value="error">Sin lectura guardada</option><option value="setup">Configurar cuenta</option><option id="throttled-option" value="throttled" disabled>Velocidad reducida · Bait</option></select></label>
+    <label class="check" id="promo-option" hidden><input id="show-promotional" type="checkbox">Mostrar desglose de datos promocionales</label>
     <label class="zoom">Zoom <input id="zoom" type="range" min="1" max="2" step="0.25" value="2"><output id="scale" for="zoom">2×</output></label>
     </details>
       </aside>
@@ -163,6 +170,7 @@
             <div class="track" role="progressbar" aria-label="Datos utilizados" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="fill" id="fill"></div></div>
             <div class="percentage" id="percentage"></div>
           </section>
+          <section class="promo-breakdown" id="promo-breakdown" hidden></section>
           <footer class="footer" id="footer"><div class="expiration" id="expiration"></div><div class="warning" id="warning" hidden>No se pudo actualizar</div></footer>
           <section class="empty" id="empty" hidden><strong id="empty-title">No se pudo cargar</strong><span id="empty-detail">Intenta más tarde</span></section>
           <div class="execution" id="execution"></div>
@@ -189,6 +197,12 @@ const SAMPLES = {
     plan_name: "Plan 7 GB", expiration_date: "2026-10-24", days_until: 5,
     last_updated: "2026-10-18T01:30:00", total_data: 7, total_unit: "GB", used_data: 5.4, used_unit: "GB", remaining_data: 1.6, remaining_unit: "GB",
     used_percentage: 77.14, remaining_percentage: 22.86,
+  },
+  telcelPromotional: {
+    plan_name: "Plan 7 GB", expiration_date: "2026-10-24", days_until: 5,
+    last_updated: "2026-10-18T01:30:00", total_data: 7.5, total_unit: "GB", used_data: 4.6, used_unit: "GB", remaining_data: 2.859, remaining_unit: "GB",
+    used_percentage: 61.33, remaining_percentage: 38.12,
+    promotional_data: { total_data: 2.5, total_unit: "GB", used_data: 0, used_unit: "MB", remaining_data: 2.5, remaining_unit: "GB" },
   },
   bait: {
     plan_name: "Paquete 3 meses Ilimitado", expiration_date: "2026-11-10", days_until: 21,
@@ -323,13 +337,15 @@ function applyImage() {
 function render() {
   const carrier = $("carrier").value;
   const isBait = carrier === "bait";
+  $("promo-option").hidden = isBait;
+  $("promo-breakdown").hidden = true;
   $("throttled-option").disabled = !isBait;
   if (!isBait && $("state").value === "throttled") $("state").value = "success";
   const state = $("state").value;
   const data = state === "throttled" ? {
     ...SAMPLES.bait, total_gb: 105, used_gb: 0, remaining_gb: 105,
     used_percentage: 0, remaining_percentage: 100, data_tier: "throttled",
-  } : SAMPLES[carrier];
+  } : (!isBait && $("show-promotional").checked ? SAMPLES.telcelPromotional : SAMPLES[carrier]);
   const name = isBait ? "Bait" : "Telcel";
   const empty = ["error", "setup"].includes(state);
   $("carrier-badge").textContent = name;
@@ -372,6 +388,23 @@ function render() {
   const [, month, day] = data.expiration_date.split("-");
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   $("expiration").textContent = `Vence ${Number(day)} ${months[Number(month) - 1]} · en ${data.days_until} días`;
+  if (!isBait && $("show-promotional").checked && data.promotional_data) {
+    const promo = data.promotional_data;
+    const toGB = (amount, unit) => unit === "MB" ? amount / 1000 : amount;
+    const rows = [
+      { label: "Datos del plan",
+        total: Math.max(0, toGB(data.total_data, data.total_unit) - toGB(promo.total_data, promo.total_unit)),
+        used: Math.max(0, toGB(data.used_data, data.used_unit) - toGB(promo.used_data, promo.used_unit)),
+        remaining: Math.max(0, toGB(data.remaining_data, data.remaining_unit) - toGB(promo.remaining_data, promo.remaining_unit)) },
+      { label: "Datos promocionales", total: toGB(promo.total_data, promo.total_unit),
+        used: toGB(promo.used_data, promo.used_unit), remaining: toGB(promo.remaining_data, promo.remaining_unit) },
+    ];
+    $("promo-breakdown").innerHTML = rows.map(row => {
+      const percent = row.total > 0 ? Math.min(100, Math.max(0, row.used / row.total * 100)) : 0;
+      return `<div class="promo-row"><div class="promo-meta"><span class="promo-heading">${row.label}</span><span>${row.used.toFixed(1)} / ${row.total.toFixed(1)} GB usados</span></div><div class="promo-track"><div class="promo-fill" style="width:${percent}%"></div></div><div>${row.remaining.toFixed(1)} GB disponibles</div></div>`;
+    }).join("");
+    $("promo-breakdown").hidden = false;
+  }
   $("warning").hidden = !["stale", "update"].includes(state);
   $("warning").textContent = state === "update" ? "Nueva versión disponible" : "No se pudo actualizar";
 }
@@ -475,6 +508,7 @@ $("carrier").addEventListener("change", () => { applyTheme(); render(); });
 $("theme").addEventListener("change", applyTheme);
 $("chart-style").addEventListener("change", () => { invalidateCode(); render(); });
 $("show-plan").addEventListener("change", () => { invalidateCode(); render(); });
+$("show-promotional").addEventListener("change", render);
 $("design").addEventListener("change", setDesign);
 $("state").addEventListener("change", () => { render(); applyImage(); });
 for (const [key, [input, picker]] of Object.entries(colorFields)) {
