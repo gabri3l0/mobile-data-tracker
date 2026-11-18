@@ -53,6 +53,22 @@ test('update links restore appearance and export the same settings in all four s
   }
 });
 
+test('Telcel preview toggles the promotional data breakdown without affecting Bait', () => {
+  const { elements: el } = preview('?carrier=telcel&design=solid');
+  assert.equal(el['promo-option'].hidden, false);
+  assert.equal(el['promo-breakdown'].hidden, true);
+  el['show-promotional'].checked = true;
+  el['show-promotional'].emit('change');
+  assert.equal(el['promo-breakdown'].hidden, false);
+  assert.match(el['promo-breakdown'].innerHTML, /Datos del plan/);
+  assert.match(el['promo-breakdown'].innerHTML, /Datos promocionales/);
+  assert.match(el['promo-breakdown'].innerHTML, /2\\.5 GB/);
+
+  el.carrier.value = 'bait'; el.carrier.emit('change');
+  assert.equal(el['promo-option'].hidden, true);
+  assert.equal(el['promo-breakdown'].hidden, true);
+});
+
 test('an explicitly empty background image survives an update link', async () => {
   const { hooks } = await loadWidget('image', { settings: { backgroundImageUrl: '', showPlanName: true } });
   const { elements: el } = preview(hooks.updateURL());
