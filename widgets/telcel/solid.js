@@ -527,6 +527,9 @@ async function fetchUsage(credentials) {
 }
 
 function parseUsage(response) {
+  if (SETTINGS.debug) {
+    console.log(`[Telcel][${WIDGET_DESIGN}] Raw response before parsing:\n${JSON.stringify(response, null, 2)}`);
+  }
   function find(node, id) {
     if (node && typeof node === "object") {
       if (node.id === id) return node.config ?? null;
